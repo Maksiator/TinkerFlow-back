@@ -75,6 +75,8 @@ jobs:
             # Zmiana nazwy pliku na standardowy docker-compose.yml dla wygody
             mv docker-compose.prod.yml docker-compose.yml || true
             # Pobranie najnowszego obrazu
-            docker compose pull api
-            # Restart serwisów bazy i api
-            docker compose up -d db api
+            docker compose pull api backup
+            # Restart serwisów bazy, api i backupu
+            docker compose up -d db api backup
+            # Usunięcie starych nieużywanych obrazów (cleanup)
+            docker image prune -f

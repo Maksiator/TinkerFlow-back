@@ -17,6 +17,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   
   # 2. BACKEND API
   api:
@@ -33,6 +38,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
   
   # 3. FRONTEND
   frontend:
@@ -43,6 +53,34 @@ services:
       - "8081:80"
     depends_on:
       - api
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # 4. KOPIA ZAPASOWA BAZY (DODATKOWY KONTENER POMOCNICZY)
+  backup:
+    image: prodrigestivill/postgres-backup-local:15
+    container_name: tinkerflow-postgres-backup
+    restart: always
+    environment:
+      - POSTGRES_HOST=db
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - BACKUP_NUM_KEEP=7
+      - BACKUP_FREQUENCY=1d
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   pgdata:
