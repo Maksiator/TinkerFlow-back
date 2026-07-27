@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # 1. BAZA DANYCH
+  db:
+    image: postgres:15-alpine
+    container_name: tinkerflow-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+  
+  # 2. BACKEND API (.NET)
+  api:
+    build:
+      context: .
+      dockerfile: TinkerFlow.API/Dockerfile
+    container_name: tinkerflow-api
+    restart: always
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=db;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}
+      - Jwt__Key=${JWT_KEY}
+      - Jwt__CookieSecure=${JWT_COOKIE_SECURE}
+      - AllowedOrigins__0=${ALLOWED_ORIGINS}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+  
+  # 3. FRONTEND (React)
+  frontend:
+    build:
+      # Wskazujemy ścieżkę do folderu z frontendem!
+      context: ../../TINKERFLOW/TinkerFlow-front
+      dockerfile: Dockerfile
+      args:
+        - VITE_API_URL=${VITE_API_URL}
+    container_name: tinkerflow-front
+    restart: always
+    ports:
+      - "8081:80" # Mapowany na 8081, by uniknąć konfliktu z Nginx na hoście VPS
+    depends_on:
+      - api
+
+volumes:
+  pgdata:

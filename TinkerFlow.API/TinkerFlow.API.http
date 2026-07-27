@@ -1,0 +1,6 @@
+@TinkerFlow.API_HostAddress = http://localhost:5258
+
+GET {{TinkerFlow.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

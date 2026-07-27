@@ -1,0 +1,18 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea/
+.DS_Store
+
+# Bazy danych SQLite i inne bazy lokalne
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+
+# Pliki środowiskowe (sekrety)
+.env
+.env.*
+!.env.example
