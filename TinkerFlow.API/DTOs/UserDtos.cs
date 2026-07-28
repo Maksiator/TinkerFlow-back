@@ -34,3 +34,8 @@ public record UserResponse(
     bool IsActive,
     List<UserBranchDto> Branches // NOWE: Lista oddziałów użytkownika
 );
+
+public record ChangePasswordRequest(
+    string CurrentPassword,
+    string NewPassword
+);

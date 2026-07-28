@@ -338,4 +338,55 @@ public async Task<IActionResult> GetUsers(
 
         return NoContent();
     }
+
+    [HttpPost("change-password")]
+    [Authorize]
+    public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (user == null) return Unauthorized();
+
+        var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            return BadRequest(new { message = string.Join(" ", errors) });
+        }
+
+        return Ok(new { message = "Hasło zostało pomyślnie zmienione." });
+    }
+
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<IActionResult> GetCurrentUserDetails()
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+
+        var user = await _userManager.Users
+            .AsNoTracking()
+            .Include(u => u.UserBranches)
+            .ThenInclude(ub => ub.Branch)
+            .FirstOrDefaultAsync(u => u.Id.ToString() == currentUserIdStr);
+
+        if (user == null) return Unauthorized();
+
+        var response = new UserResponse(
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.Email ?? string.Empty,
+            user.Role,
+            user.IsActive,
+            user.UserBranches.Select(ub => new UserBranchDto(
+                ub.BranchId,
+                ub.Branch.Name
+            )).ToList()
+        );
+
+        return Ok(response);
+    }
 }
