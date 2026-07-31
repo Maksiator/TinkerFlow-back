@@ -34,7 +34,7 @@ services:
       - Jwt__CookieSecure=${JWT_COOKIE_SECURE}
       - AllowedOrigins__0=${ALLOWED_ORIGINS}
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       db:
         condition: service_healthy
@@ -50,7 +50,7 @@ services:
     container_name: tinkerflow-front
     restart: always
     ports:
-      - "8081:80"
+      - "127.0.0.1:8081:80"
     depends_on:
       - api
     logging:
