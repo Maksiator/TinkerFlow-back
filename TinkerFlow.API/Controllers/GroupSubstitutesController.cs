@@ -106,17 +106,25 @@ public class GroupSubstitutesController : ControllerBase
 
         // LOGIKA: Jeśli frontend przysłał customowe daty (bo koordynator je nadpisał), to je szanujemy. 
         // Jeśli nie (przyszły nulle), to wyliczamy z domyślnych ustawień Admina.
-        var validFrom = request.ValidFrom ?? request.LessonDate.Date.AddDays(-settings.SubstituteDaysBefore);
-        var validUntil = request.ValidUntil ?? request.LessonDate.Date.AddDays(settings.SubstituteDaysAfter).AddHours(23).AddMinutes(59);
+        // Npgsql wymaga, aby zapisywane daty do kolumn 'timestamp with time zone' miały Kind = DateTimeKind.Utc
+        var lessonDateUtc = DateTime.SpecifyKind(request.LessonDate, DateTimeKind.Utc);
+        
+        var validFromUtc = request.ValidFrom.HasValue 
+            ? DateTime.SpecifyKind(request.ValidFrom.Value, DateTimeKind.Utc)
+            : DateTime.SpecifyKind(request.LessonDate.Date.AddDays(-settings.SubstituteDaysBefore), DateTimeKind.Utc);
+            
+        var validUntilUtc = request.ValidUntil.HasValue 
+            ? DateTime.SpecifyKind(request.ValidUntil.Value, DateTimeKind.Utc)
+            : DateTime.SpecifyKind(request.LessonDate.Date.AddDays(settings.SubstituteDaysAfter).AddHours(23).AddMinutes(59), DateTimeKind.Utc);
 
         var substitute = new GroupSubstitute
         {
             Id = Guid.NewGuid(),
             GroupId = request.GroupId,
             SubstituteTrainerId = request.TrainerId,
-            LessonDate = request.LessonDate,
-            ValidFrom = validFrom,
-            ValidUntil = validUntil
+            LessonDate = lessonDateUtc,
+            ValidFrom = validFromUtc,
+            ValidUntil = validUntilUtc
         };
 
         _context.GroupSubstitutes.Add(substitute);
