@@ -70,7 +70,8 @@ builder.Services.AddIdentityCore<User>(options =>
     options.User.RequireUniqueEmail = true;
 })
 .AddEntityFrameworkStores<TinkerFlowDbContext>()
-.AddDefaultTokenProviders();
+.AddDefaultTokenProviders()
+.AddErrorDescriber<TinkerFlow.API.Localization.PolishIdentityErrorDescriber>();
 
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("Brak klucza JWT w appsettings.json!");
 
