@@ -63,16 +63,11 @@ public class StudentsController : ControllerBase
             var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
             if (!branchIds.Any()) return Ok(new PagedResult<StudentResponse>(new List<StudentResponse>(), 0, 0, page, pageSize));
 
-            if (isSearching)
-            {
-                // TRYB WYSZUKIWANIA: Pokazujemy uczniów z oddziałów Koordynatora ORAZ wszystkich bez grupy (nieaktywnych)
-                query = query.Where(s => (s.GroupId != null && branchIds.Contains(s.Group!.BranchId)) || s.GroupId == null);
-            }
-            else
-            {
-                // TRYB DOMYŚLNY: Pokazujemy TYLKO uczniów przypisanych do oddziałów Koordynatora
-                query = query.Where(s => s.GroupId != null && branchIds.Contains(s.Group!.BranchId));
-            }
+            // Pokazujemy uczniów, którzy należą do grupy w oddziałach koordynatora, LUB uczniów bez grupy przypisanych bezpośrednio do oddziału koordynatora
+            query = query.Where(s => 
+                (s.GroupId != null && branchIds.Contains(s.Group!.BranchId)) || 
+                (s.GroupId == null && s.BranchId != null && branchIds.Contains(s.BranchId.Value))
+            );
         }
 
         if (isSearching)
@@ -114,7 +109,8 @@ public class StudentsController : ControllerBase
             .Select(s => new StudentResponse(
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
-                s.Group != null ? s.Group.Name : null 
+                s.Group != null ? s.Group.Name : null,
+                s.BranchId
             ))
             .ToListAsync();
 
@@ -142,7 +138,8 @@ public class StudentsController : ControllerBase
             .Select(s => new StudentResponse(
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
-                s.Group != null ? s.Group.Name : null
+                s.Group != null ? s.Group.Name : null,
+                s.BranchId
             ))
             .ToListAsync();
 
@@ -172,8 +169,11 @@ public class StudentsController : ControllerBase
         {
             var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
             
-            // Szukamy w przypisanych oddziałach ORAZ wśród uczniów bez grupy (Duchów)
-            query = query.Where(s => (s.GroupId != null && branchIds.Contains(s.Group!.BranchId)) || s.GroupId == null);
+            // Szukamy tylko w oddziałach koordynatora (po grupie lub bezpośrednio)
+            query = query.Where(s => 
+                (s.GroupId != null && branchIds.Contains(s.Group!.BranchId)) || 
+                (s.GroupId == null && s.BranchId != null && branchIds.Contains(s.BranchId.Value))
+            );
         }
 
         var students = await query
@@ -181,7 +181,8 @@ public class StudentsController : ControllerBase
             .Select(s => new StudentResponse(
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
-                s.Group != null ? s.Group.Name : null
+                s.Group != null ? s.Group.Name : null,
+                s.BranchId
             ))
             .ToListAsync();
 
@@ -208,8 +209,16 @@ public class StudentsController : ControllerBase
             if (currentUser.Role == UserRole.Coordinator)
             {
                 var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
-                if (student.GroupId.HasValue && !branchIds.Contains(student.Group!.BranchId))
-                    return Forbid();
+                if (student.GroupId.HasValue)
+                {
+                    if (!branchIds.Contains(student.Group!.BranchId))
+                        return Forbid();
+                }
+                else
+                {
+                    if (!student.BranchId.HasValue || !branchIds.Contains(student.BranchId.Value))
+                        return Forbid();
+                }
             }
             else if (currentUser.Role == UserRole.Trainer)
             {
@@ -222,7 +231,7 @@ public class StudentsController : ControllerBase
         var response = new StudentResponse(
             student.Id, student.FirstName, student.LastName, student.DateOfBirth, student.Level, 
             student.IsIndependent, student.NeedsAttention, student.GroupId, 
-            student.Group?.Name
+            student.Group?.Name, student.BranchId
         );
 
         return Ok(response);
@@ -238,10 +247,42 @@ public class StudentsController : ControllerBase
         var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
         if (currentUser == null) return Unauthorized();
 
-        if (currentUser.Role == UserRole.Coordinator && request.GroupId.HasValue)
+        Guid? resolvedBranchId = null;
+        if (request.GroupId.HasValue)
         {
-            var hasAccess = await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value);
-            if (!hasAccess) return Forbid();
+            var group = await _context.Groups.FindAsync(request.GroupId.Value);
+            if (group == null) return BadRequest(new { message = "Podana grupa nie istnieje." });
+            resolvedBranchId = group.BranchId;
+        }
+        else
+        {
+            resolvedBranchId = request.BranchId;
+        }
+
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+            if (request.GroupId.HasValue)
+            {
+                var hasAccess = await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value);
+                if (!hasAccess) return Forbid();
+            }
+            else
+            {
+                if (!resolvedBranchId.HasValue)
+                {
+                    // Domyślnie przypisujemy pierwszy oddział koordynatora
+                    resolvedBranchId = branchIds.FirstOrDefault();
+                }
+                if (!resolvedBranchId.HasValue || !branchIds.Contains(resolvedBranchId.Value))
+                {
+                    return Forbid();
+                }
+            }
+        }
+        else if (currentUser.Role == UserRole.Admin && !resolvedBranchId.HasValue)
+        {
+            return BadRequest(new { message = "Należy podać oddział (BranchId) dla ucznia bez grupy." });
         }
 
         var newStudent = new Student
@@ -253,7 +294,8 @@ public class StudentsController : ControllerBase
             Level = request.Level,
             IsIndependent = request.IsIndependent,
             NeedsAttention = request.NeedsAttention,
-            GroupId = request.GroupId
+            GroupId = request.GroupId,
+            BranchId = resolvedBranchId
         };
 
         _context.Students.Add(newStudent);
@@ -266,7 +308,7 @@ public class StudentsController : ControllerBase
         var response = new StudentResponse(
             newStudent.Id, newStudent.FirstName, newStudent.LastName, newStudent.DateOfBirth,
             newStudent.Level, newStudent.IsIndependent, newStudent.NeedsAttention,
-            newStudent.GroupId, groupName
+            newStudent.GroupId, groupName, newStudent.BranchId
         );
         return CreatedAtAction(nameof(GetStudent), new { id = newStudent.Id }, response);
     }
@@ -284,16 +326,49 @@ public class StudentsController : ControllerBase
         var existingStudent = await _context.Students.FindAsync(id);
         if (existingStudent == null) return NotFound(new { message = "Nie odnaleziono ucznia o podanym ID." });
 
+        Guid? resolvedBranchId = existingStudent.BranchId;
+        if (request.GroupId.HasValue)
+        {
+            var group = await _context.Groups.FindAsync(request.GroupId.Value);
+            if (group == null) return BadRequest(new { message = "Podana grupa nie istnieje." });
+            resolvedBranchId = group.BranchId;
+        }
+        else if (request.BranchId.HasValue)
+        {
+            resolvedBranchId = request.BranchId;
+        }
+
         if (currentUser.Role == UserRole.Coordinator)
         {
-            if (existingStudent.GroupId.HasValue && !await _accessService.CanAccessGroupAsync(currentUser.Id, existingStudent.GroupId.Value))
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+            
+            // Dostęp do dotychczasowych danych ucznia
+            if (existingStudent.GroupId.HasValue)
             {
-                return Forbid();
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, existingStudent.GroupId.Value))
+                    return Forbid();
             }
-            if (request.GroupId.HasValue && !await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value))
+            else if (existingStudent.BranchId.HasValue)
             {
-                return Forbid();
+                if (!branchIds.Contains(existingStudent.BranchId.Value))
+                    return Forbid();
             }
+
+            // Dostęp do nowych danych (grupa lub oddział)
+            if (request.GroupId.HasValue)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value))
+                    return Forbid();
+            }
+            else if (resolvedBranchId.HasValue)
+            {
+                if (!branchIds.Contains(resolvedBranchId.Value))
+                    return Forbid();
+            }
+        }
+        else if (currentUser.Role == UserRole.Admin && !request.GroupId.HasValue && !resolvedBranchId.HasValue)
+        {
+            return BadRequest(new { message = "Należy podać oddział (BranchId) dla ucznia bez grupy." });
         }
 
         if (request.RecordHistory && existingStudent.GroupId.HasValue && existingStudent.GroupId.Value != request.GroupId)
@@ -316,6 +391,7 @@ public class StudentsController : ControllerBase
         existingStudent.IsIndependent = request.IsIndependent;
         existingStudent.NeedsAttention = request.NeedsAttention;
         existingStudent.GroupId = request.GroupId;
+        existingStudent.BranchId = resolvedBranchId;
         
         await _context.SaveChangesAsync();
         return NoContent();
@@ -334,15 +410,38 @@ public class StudentsController : ControllerBase
         var student = await _context.Students.FindAsync(id);
         if (student == null) return NotFound(new { message = "Nie odnaleziono ucznia." });
 
+        Guid? targetBranchId = student.BranchId;
+        if (request.GroupId.HasValue)
+        {
+            var group = await _context.Groups.FindAsync(request.GroupId.Value);
+            if (group == null) return BadRequest(new { message = "Podana grupa nie istnieje." });
+            targetBranchId = group.BranchId;
+        }
+
         if (currentUser.Role == UserRole.Coordinator)
         {
-            if (student.GroupId.HasValue && !await _accessService.CanAccessGroupAsync(currentUser.Id, student.GroupId.Value))
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+
+            // Sprawdzamy dostęp do starej strefy ucznia
+            if (student.GroupId.HasValue)
             {
-                return Forbid();
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, student.GroupId.Value))
+                    return Forbid();
             }
-            if (request.GroupId.HasValue && !await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value))
+            else if (student.BranchId.HasValue)
             {
-                return Forbid();
+                if (!branchIds.Contains(student.BranchId.Value)) return Forbid();
+            }
+
+            // Sprawdzamy dostęp do nowej strefy ucznia
+            if (request.GroupId.HasValue)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, request.GroupId.Value))
+                    return Forbid();
+            }
+            else if (targetBranchId.HasValue)
+            {
+                if (!branchIds.Contains(targetBranchId.Value)) return Forbid();
             }
         }
 
@@ -360,6 +459,7 @@ public class StudentsController : ControllerBase
         }
 
         student.GroupId = request.GroupId; 
+        student.BranchId = targetBranchId;
         await _context.SaveChangesAsync();
         return NoContent();
     }
@@ -445,8 +545,17 @@ public class StudentsController : ControllerBase
 
         var groupIds = requests.Where(r => r.GroupId.HasValue).Select(r => r.GroupId!.Value).Distinct().ToList();
 
+        // Pobieramy mapowanie GroupId -> BranchId, żeby uniknąć zapytań N+1
+        var groupBranches = await _context.Groups
+            .Where(g => groupIds.Contains(g.Id))
+            .ToDictionaryAsync(g => g.Id, g => g.BranchId);
+
+        var coordinatorBranchIds = new List<Guid>();
         if (currentUser.Role == UserRole.Coordinator)
         {
+            coordinatorBranchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+            
+            // Weryfikacja grup
             foreach (var groupId in groupIds)
             {
                 if (!await _accessService.CanAccessGroupAsync(currentUser.Id, groupId))
@@ -454,20 +563,65 @@ public class StudentsController : ControllerBase
                     return Forbid();
                 }
             }
+
+            // Weryfikacja oddziałów bezpośrednich dla uczniów bez grupy
+            var directBranchIds = requests
+                .Where(r => !r.GroupId.HasValue && r.BranchId.HasValue)
+                .Select(r => r.BranchId!.Value)
+                .Distinct()
+                .ToList();
+
+            foreach (var branchId in directBranchIds)
+            {
+                if (!coordinatorBranchIds.Contains(branchId))
+                {
+                    return Forbid();
+                }
+            }
         }
 
+        // Pobieramy istniejących uczniów z tych grup (lub bez grup), by uniknąć duplikatów
         var existingStudents = await _context.Students
-            .Where(s => s.GroupId != null && groupIds.Contains(s.GroupId.Value))
+            .Where(s => (s.GroupId != null && groupIds.Contains(s.GroupId.Value)) || s.GroupId == null)
             .ToListAsync();
 
         var newStudents = new List<Student>();
 
         foreach (var req in requests)
         {
+            Guid? resolvedBranchId = null;
+            if (req.GroupId.HasValue && groupBranches.TryGetValue(req.GroupId.Value, out var bId))
+            {
+                resolvedBranchId = bId;
+            }
+            else
+            {
+                resolvedBranchId = req.BranchId;
+            }
+
+            if (currentUser.Role == UserRole.Coordinator)
+            {
+                if (!resolvedBranchId.HasValue)
+                {
+                    // Domyślny oddział koordynatora
+                    resolvedBranchId = coordinatorBranchIds.FirstOrDefault();
+                }
+                if (!resolvedBranchId.HasValue || !coordinatorBranchIds.Contains(resolvedBranchId.Value))
+                {
+                    continue; // Skip invalid entries for safety
+                }
+            }
+            else if (currentUser.Role == UserRole.Admin && !resolvedBranchId.HasValue)
+            {
+                // Domyślny pierwszy oddział dla admina
+                resolvedBranchId = await _context.Branches.Select(b => b.Id).FirstOrDefaultAsync();
+            }
+
             var exists = existingStudents.Any(s => 
                 s.FirstName.ToLower() == req.FirstName.Trim().ToLower() && 
                 s.LastName.ToLower() == req.LastName.Trim().ToLower() &&
-                s.GroupId == req.GroupId);
+                s.GroupId == req.GroupId &&
+                (s.GroupId != null || s.BranchId == resolvedBranchId));
 
             if (!exists)
             {
@@ -480,7 +634,8 @@ public class StudentsController : ControllerBase
                     Level = req.Level, 
                     IsIndependent = req.IsIndependent,
                     NeedsAttention = req.NeedsAttention,
-                    GroupId = req.GroupId
+                    GroupId = req.GroupId,
+                    BranchId = resolvedBranchId
                 });
             }
         }
@@ -491,6 +646,6 @@ public class StudentsController : ControllerBase
             await _context.SaveChangesAsync();
         }
 
-        return Ok(new { message = $"Pomyślnie dodano {newStudents.Count} nowych uczniów. (Pominięto duplikaty, jeśli były)." });
+        return Ok(new { message = $"Pomyślnie zaimportowano {newStudents.Count} nowych uczniów. (Pominięto duplikaty, jeśli były)." });
     }
 }

@@ -95,5 +95,12 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             .WithMany() // Encja Group nie musi o tym wiedzieć
             .HasForeignKey(tgli => tgli.GroupId)
             .OnDelete(DeleteBehavior.Cascade); // Gdy usuniemy grupę całkowicie z bazy, zniknie z list
+
+        // 6. Relacja Student -> Branch (opcjonalna, dla uczniów bez grupy)
+        builder.Entity<Student>()
+            .HasOne(s => s.Branch)
+            .WithMany()
+            .HasForeignKey(s => s.BranchId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

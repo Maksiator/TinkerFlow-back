@@ -15,6 +15,9 @@ public class Student
     
     public Guid? GroupId { get; set; }
     public Group? Group { get; set; }
+
+    public Guid? BranchId { get; set; }
+    public Branch? Branch { get; set; }
     
     public ICollection<PrintLog> PrintLogs { get; set; } = new List<PrintLog>();
 }

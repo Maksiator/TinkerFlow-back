@@ -9,7 +9,8 @@ public record CreateStudentRequest(
     SkillLevel Level,
     bool IsIndependent,
     bool NeedsAttention,
-    Guid? GroupId
+    Guid? GroupId,
+    Guid? BranchId = null
 );  
 
 public record UpdateStudentRequest(
@@ -20,6 +21,7 @@ public record UpdateStudentRequest(
     bool IsIndependent,
     bool NeedsAttention,
     Guid? GroupId,
+    Guid? BranchId = null,
     bool RecordHistory = true,
     bool IsMidYear = true,
     string? AcademicYear = null
@@ -41,6 +43,6 @@ public record StudentResponse(
     bool IsIndependent,
     bool NeedsAttention,
     Guid? GroupId,
-    string? GroupName
-    
+    string? GroupName,
+    Guid? BranchId = null
 );
