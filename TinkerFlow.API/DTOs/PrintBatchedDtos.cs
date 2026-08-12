@@ -31,6 +31,8 @@ public record PrintBatchResponse(
     Guid Id,
     Guid GroupId,
     string GroupName,
+    Guid BranchId,
+    string BranchName,
     DateTime LessonDate,
     DateTime Deadline,
     string? Notes,

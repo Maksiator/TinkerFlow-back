@@ -151,6 +151,7 @@ public class PrintBatchesController : ControllerBase
     {
         var query = _context.PrintBatches
             .Include(pb => pb.Group)
+                .ThenInclude(g => g.Branch)
             .Include(pb => pb.PrintJobs)
                 .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -164,13 +165,15 @@ public class PrintBatchesController : ControllerBase
         }
 
         var batches = await query
-            .OrderBy(pb => pb.Deadline)
+            .OrderByDescending(pb => pb.CreatedAt) // Od najnowszych
             .ToListAsync();
 
         var response = batches.Select(pb => new PrintBatchResponse(
             pb.Id,
             pb.GroupId,
             pb.Group != null ? pb.Group.Name : "Nieznana grupa",
+            pb.Group != null ? pb.Group.BranchId : Guid.Empty,
+            pb.Group != null && pb.Group.Branch != null ? pb.Group.Branch.Name : "Nieznany oddział",
             pb.LessonDate,
             pb.Deadline,
             pb.Notes,
@@ -386,6 +389,7 @@ public class PrintBatchesController : ControllerBase
     {
         var batch = await _context.PrintBatches
             .Include(pb => pb.Group)
+                .ThenInclude(g => g.Branch)
             .Include(pb => pb.PrintJobs)
                 .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -402,6 +406,8 @@ public class PrintBatchesController : ControllerBase
             batch.Id,
             batch.GroupId,
             batch.Group?.Name ?? "Nieznana grupa",
+            batch.Group != null ? batch.Group.BranchId : Guid.Empty,
+            batch.Group != null && batch.Group.Branch != null ? batch.Group.Branch.Name : "Nieznany oddział",
             batch.LessonDate,
             batch.Deadline,
             batch.Notes,
@@ -533,6 +539,7 @@ public class PrintBatchesController : ControllerBase
 
         var batches = await _context.PrintBatches
             .Include(pb => pb.Group)
+                .ThenInclude(g => g.Branch)
             .Include(pb => pb.PrintJobs)
             .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -546,6 +553,8 @@ public class PrintBatchesController : ControllerBase
             pb.Id,
             pb.GroupId,
             pb.Group?.Name ?? "Nieznana grupa",
+            pb.Group != null ? pb.Group.BranchId : Guid.Empty,
+            pb.Group != null && pb.Group.Branch != null ? pb.Group.Branch.Name : "Nieznany oddział",
             pb.LessonDate,
             pb.Deadline,
             pb.Notes,
