@@ -12,6 +12,8 @@ public class User : IdentityUser<Guid>
 
     public bool IsActive { get; set; } = true;
     
+    public bool MustChangePassword { get; set; } = false;
+    
     public ICollection<TrainerGroupList> FavoriteLists { get; set; } = new List<TrainerGroupList>();
     
     public ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>(); // Do jakich oddziałów należy

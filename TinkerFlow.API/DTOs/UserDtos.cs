@@ -32,7 +32,8 @@ public record UserResponse(
     string Email,
     TinkerFlow.Domain.Enums.UserRole Role,
     bool IsActive,
-    List<UserBranchDto> Branches // NOWE: Lista oddziałów użytkownika
+    List<UserBranchDto> Branches, // NOWE: Lista oddziałów użytkownika
+    bool MustChangePassword
 );
 
 public record ChangePasswordRequest(

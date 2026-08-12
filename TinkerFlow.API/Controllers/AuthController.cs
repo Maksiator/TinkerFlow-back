@@ -55,7 +55,7 @@ public class AuthController : ControllerBase
         };
         Response.Cookies.Append("tinkerflow_token", token, cookieOptions);
         
-        return Ok(new AuthResponse(token, user.Id, user.FirstName, user.LastName, user.Role));
+        return Ok(new AuthResponse(token, user.Id, user.FirstName, user.LastName, user.Role, user.MustChangePassword));
     }
 
     private string GenerateJwtToken(User user)

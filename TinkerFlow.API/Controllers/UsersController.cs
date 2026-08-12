@@ -90,7 +90,8 @@ public async Task<IActionResult> GetUsers(
         u.UserBranches.Select(ub => new UserBranchDto(
             ub.BranchId,
             ub.Branch.Name
-        )).ToList()
+        )).ToList(),
+        u.MustChangePassword
     )).ToList();
 
     return Ok(new PagedResult<UserResponse>(result, totalCount, totalPages, page, pageSize));
@@ -157,7 +158,7 @@ public async Task<IActionResult> GetUsers(
             await _context.SaveChangesAsync();
         }
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword));
     }
 
     [HttpPut("{id}")]
@@ -242,7 +243,7 @@ public async Task<IActionResult> GetUsers(
             .Select(ub => new UserBranchDto(ub.BranchId, ub.Branch.Name))
             .ToListAsync();
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword));
     }
     
     [HttpPut("{id}/status")]
@@ -359,6 +360,9 @@ public async Task<IActionResult> GetUsers(
             return BadRequest(new { message = string.Join(" ", errors) });
         }
 
+        user.MustChangePassword = false;
+        await _userManager.UpdateAsync(user);
+
         return Ok(new { message = "Hasło zostało pomyślnie zmienione." });
     }
 
@@ -387,7 +391,8 @@ public async Task<IActionResult> GetUsers(
             user.UserBranches.Select(ub => new UserBranchDto(
                 ub.BranchId,
                 ub.Branch.Name
-            )).ToList()
+            )).ToList(),
+            user.MustChangePassword
         );
 
         return Ok(response);
@@ -438,6 +443,9 @@ public async Task<IActionResult> GetUsers(
             return BadRequest(new { message = string.Join(" ", errors) });
         }
 
-        return Ok(new { message = "Hasło zostało pomyślnie zresetowane." });
+        user.MustChangePassword = true;
+        await _userManager.UpdateAsync(user);
+
+        return Ok(new { message = "Hasło tymczasowe zostało pomyślnie ustawione." });
     }
 }
