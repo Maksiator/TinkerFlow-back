@@ -147,8 +147,20 @@ public class PrintBatchesController : ControllerBase
     }
 
     [HttpGet("farm")]
-    public async Task<IActionResult> GetBatchesForFarm([FromQuery] PrintBatchState? statusFilter)
+    public async Task<IActionResult> GetBatchesForFarm([FromQuery] PrintBatchState? statusFilter, [FromQuery] bool includeCompleted = false)
     {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim))
+            return Unauthorized();
+
+        var userId = Guid.Parse(userIdClaim);
+        var user = await _context.Users
+            .Include(u => u.UserBranches)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user == null)
+            return Unauthorized();
+
         var query = _context.PrintBatches
             .Include(pb => pb.Group)
                 .ThenInclude(g => g.Branch)
@@ -158,6 +170,19 @@ public class PrintBatchesController : ControllerBase
                 .ThenInclude(pj => pj.StudentProject)
                     .ThenInclude(sp => sp!.Project) 
             .AsQueryable();
+
+        // Jeśli użytkownik nie jest administratorem, filtrujemy zlecenia tylko z jego oddziałów
+        if (user.Role != UserRole.Admin)
+        {
+            var allowedBranchIds = user.UserBranches.Select(ub => ub.BranchId).ToList();
+            query = query.Where(pb => pb.Group != null && allowedBranchIds.Contains(pb.Group.BranchId));
+        }
+
+        // Domyślnie pomijamy zakończone zlecenia, chyba że includeCompleted = true
+        if (!includeCompleted)
+        {
+            query = query.Where(pb => pb.Status != PrintBatchState.Completed);
+        }
 
         if (statusFilter.HasValue)
         {
