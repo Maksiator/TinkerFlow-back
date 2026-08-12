@@ -187,7 +187,8 @@ public class PrintBatchesController : ControllerBase
                     ? pj.StudentProject.Project.Name 
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
-            )).ToList()
+            )).ToList(),
+            pb.CreatedAt
         )).ToList();
 
         return Ok(response);
@@ -421,7 +422,8 @@ public class PrintBatchesController : ControllerBase
                     ? pj.StudentProject.Project.Name 
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
-            )).ToList()
+            )).ToList(),
+            batch.CreatedAt
         );
 
         return Ok(response);
@@ -568,7 +570,8 @@ public class PrintBatchesController : ControllerBase
                     ? pj.StudentProject.Project.Name 
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
-            )).ToList()
+            )).ToList(),
+            pb.CreatedAt
         )).ToList();
 
         return Ok(response);

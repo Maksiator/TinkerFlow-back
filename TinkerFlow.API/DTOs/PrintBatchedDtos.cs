@@ -37,7 +37,8 @@ public record PrintBatchResponse(
     DateTime Deadline,
     string? Notes,
     PrintBatchState Status,
-    List<PrintJobResponse> PrintJobs
+    List<PrintJobResponse> PrintJobs,
+    DateTime CreatedAt
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu
