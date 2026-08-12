@@ -39,3 +39,7 @@ public record ChangePasswordRequest(
     string CurrentPassword,
     string NewPassword
 );
+
+public record ResetPasswordRequest(
+    string NewPassword
+);

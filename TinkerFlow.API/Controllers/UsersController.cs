@@ -392,4 +392,52 @@ public async Task<IActionResult> GetUsers(
 
         return Ok(response);
     }
+
+    [HttpPost("{id}/reset-password")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> ResetPassword(Guid id, [FromBody] ResetPasswordRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+        var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (currentUser == null) return Unauthorized();
+
+        var user = await _userManager.FindByIdAsync(id.ToString());
+        if (user == null) return NotFound(new { message = "Nie znaleziono użytkownika o podanym ID." });
+
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            if (user.Role == UserRole.Admin || user.Role == UserRole.Coordinator)
+            {
+                return BadRequest(new { message = "Koordynator nie może resetować hasła administratorowi ani innemu koordynatorowi." });
+            }
+
+            var coordinatorBranchIds = await _context.UserBranches
+                .Where(ub => ub.UserId == currentUser.Id)
+                .Select(ub => ub.BranchId)
+                .ToListAsync();
+
+            var userBranchIds = await _context.UserBranches
+                .Where(ub => ub.UserId == user.Id)
+                .Select(ub => ub.BranchId)
+                .ToListAsync();
+
+            var sharesBranch = userBranchIds.Any(bid => coordinatorBranchIds.Contains(bid));
+            if (!sharesBranch && user.Id != currentUser.Id)
+            {
+                return Forbid();
+            }
+        }
+
+        var token = await _userManager.GeneratePasswordResetTokenAsync(user);
+        var result = await _userManager.ResetPasswordAsync(user, token, request.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            return BadRequest(new { message = string.Join(" ", errors) });
+        }
+
+        return Ok(new { message = "Hasło zostało pomyślnie zresetowane." });
+    }
 }
