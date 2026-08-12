@@ -131,7 +131,8 @@ public async Task<IActionResult> GetUsers(
             FirstName = request.FirstName,
             LastName = request.LastName,
             Role = request.Role,
-            IsActive = true
+            IsActive = true,
+            MustChangePassword = true
         };
 
         var result = await _userManager.CreateAsync(user, request.Password);
