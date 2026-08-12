@@ -11,7 +11,7 @@ namespace TinkerFlow.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Coordinator")] 
+[Authorize] 
 public class UsersController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
@@ -97,6 +97,7 @@ public async Task<IActionResult> GetUsers(
 }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
     {
         var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -160,6 +161,7 @@ public async Task<IActionResult> GetUsers(
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> UpdateUser(Guid id, [FromBody] UpdateUserRequest request)
     {
         var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
@@ -244,6 +246,7 @@ public async Task<IActionResult> GetUsers(
     }
     
     [HttpPut("{id}/status")]
+    [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> ToggleUserStatus(Guid id)
     {
         var user = await _userManager.FindByIdAsync(id.ToString());

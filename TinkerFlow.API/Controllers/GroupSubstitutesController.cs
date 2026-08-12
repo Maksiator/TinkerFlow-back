@@ -101,6 +101,17 @@ public class GroupSubstitutesController : ControllerBase
             if (!hasAccess) return Forbid();
         }
 
+        var group = await _context.Groups.FindAsync(request.GroupId);
+        if (group == null)
+        {
+            return NotFound(new { message = "Nie znaleziono wybranej grupy." });
+        }
+
+        if (group.PrimaryTrainerId == request.TrainerId)
+        {
+            return BadRequest(new { message = "Nie możesz przypisać zastępstwa głównemu prowadzącemu tej grupy." });
+        }
+
         var settings = await _context.SystemSettings.FirstOrDefaultAsync() 
                        ?? new SystemSetting { SubstituteDaysBefore = 2, SubstituteDaysAfter = 2 };
 
