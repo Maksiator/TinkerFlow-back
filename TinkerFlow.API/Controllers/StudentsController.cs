@@ -36,7 +36,7 @@ public class StudentsController : ControllerBase
     }
     
     [HttpGet]
-    [Authorize(Roles = "Admin,Coordinator")]
+    [Authorize(Roles = "Admin,Coordinator,Trainer")]
     public async Task<ActionResult<PagedResult<StudentResponse>>> GetStudents(
         [FromQuery] string? search,
         [FromQuery] string sortBy = "lastName",
@@ -68,6 +68,14 @@ public class StudentsController : ControllerBase
                 (s.GroupId != null && branchIds.Contains(s.Group!.BranchId)) || 
                 (s.GroupId == null && s.BranchId != null && branchIds.Contains(s.BranchId.Value))
             );
+        }
+        // LOGIKA DLA TRENERA:
+        else if (currentUser.Role == UserRole.Trainer)
+        {
+            var accessibleGroupsQuery = await _accessService.GetAccessibleGroupsQueryAsync(currentUser.Id);
+            var accessibleGroupIds = await accessibleGroupsQuery.Select(g => g.Id).ToListAsync();
+
+            query = query.Where(s => s.GroupId != null && accessibleGroupIds.Contains(s.GroupId.Value));
         }
 
         if (isSearching)
