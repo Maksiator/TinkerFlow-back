@@ -38,7 +38,9 @@ public record PrintBatchResponse(
     string? Notes,
     PrintBatchState Status,
     List<PrintJobResponse> PrintJobs,
-    DateTime CreatedAt
+    DateTime CreatedAt,
+    Guid? AssignedPrinterId = null,
+    string? AssignedPrinterName = null
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu

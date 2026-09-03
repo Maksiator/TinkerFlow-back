@@ -142,9 +142,9 @@ public async Task<IActionResult> GetUsers(
             return BadRequest(result.Errors);
         }
 
-        // NOWE: Przypisywanie do oddziałów
+        // Przypisywanie do oddziałów (tylko Trener i Koordynator)
         var assignedBranches = new List<UserBranchDto>();
-        if (request.BranchIds.Any())
+        if (request.Role != UserRole.Printer && request.Role != UserRole.Admin && request.BranchIds != null && request.BranchIds.Any())
         {
             // Pobieramy nazwy oddziałów z bazy, żeby od razu poprawnie zbudować obiekt Response
             var branchesFromDb = await _context.Branches
@@ -222,20 +222,20 @@ public async Task<IActionResult> GetUsers(
             return BadRequest(result.Errors);
         }
 
-        // NOWE: Aktualizacja oddziałów
-        if (request.BranchIds.Any())
+        // Aktualizacja oddziałów:
+        // 1. Zawsze czyścimy dotychczasowe oddziały usera (pozwala to na wyzerowanie/odznaczenie wszystkich)
+        _context.UserBranches.RemoveRange(user.UserBranches);
+
+        // 2. Tylko Trener i Koordynator posiadają przypisane oddziały (Drukarz i Admin nie)
+        if (request.Role != UserRole.Printer && request.Role != UserRole.Admin && request.BranchIds != null && request.BranchIds.Any())
         {
-            // 1. Usuwamy wszystkie dotychczasowe przypisania tego usera
-            _context.UserBranches.RemoveRange(user.UserBranches);
-            
-            // 2. Dodajemy nowe przypisania
             foreach (var branchId in request.BranchIds)
             {
                 _context.UserBranches.Add(new UserBranch { UserId = user.Id, BranchId = branchId });
             }
-            
-            await _context.SaveChangesAsync();
         }
+
+        await _context.SaveChangesAsync();
 
         // Zwracamy zaktualizowanego usera, dociągając na nowo oddziały, żeby mieć ich nazwy
         var updatedBranches = await _context.UserBranches

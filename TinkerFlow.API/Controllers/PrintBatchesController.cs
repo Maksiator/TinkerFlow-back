@@ -164,6 +164,8 @@ public class PrintBatchesController : ControllerBase
         var query = _context.PrintBatches
             .Include(pb => pb.Group)
                 .ThenInclude(g => g.Branch)
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.AssignedPrinter)
             .Include(pb => pb.PrintJobs)
                 .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -218,7 +220,9 @@ public class PrintBatchesController : ControllerBase
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
             )).ToList(),
-            pb.CreatedAt
+            pb.CreatedAt,
+            pb.Group?.AssignedPrinterId,
+            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null
         )).ToList();
 
         return Ok(response);

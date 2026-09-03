@@ -71,7 +71,7 @@ public class GroupsController : ControllerBase
         return CreatedAtAction(nameof(GetGroup), new { id = newGroup.Id }, new { id = newGroup.Id });
     }
 
-    [HttpPut("{id}")]
+    [HttpPut("{id:guid}")]
     [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> UpdateGroup(Guid id, [FromBody] UpdateGroupRequest request)
     {
@@ -110,7 +110,7 @@ public class GroupsController : ControllerBase
     
     // --- TUTAJ ZACZYNAJĄ SIĘ ODCHUDZONE METODY GET ---
 
-    [HttpGet("{id}")]
+    [HttpGet("{id:guid}")]
     public async Task<IActionResult> GetGroup(Guid id)
     {
         // Wykorzystujemy ujednolicony serwis do odfiltrowania bazy
@@ -284,7 +284,7 @@ public class GroupsController : ControllerBase
         return Ok(response);
     }
     
-    [HttpDelete("{id}")]
+    [HttpDelete("{id:guid}")]
     [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> DeleteGroup(Guid id)
     {
@@ -490,7 +490,7 @@ public class GroupsController : ControllerBase
         return Ok(new { count = groups.Count, message = $"Pomyślnie zaktualizowano przypisanego drukarza dla {groups.Count} grup." });
     }
 
-    [HttpPost("{id}/archive")]
+    [HttpPost("{id:guid}/archive")]
     [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> ArchiveGroup(Guid id, [FromQuery] string academicYear)
     {
