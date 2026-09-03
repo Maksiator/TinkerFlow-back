@@ -511,6 +511,172 @@ public class StudentsController : ControllerBase
         return NoContent();
     }
 
+    // 8a. MASOWE USUWANIE UCZNIÓW
+    [HttpPost("bulk-delete")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> BulkDeleteStudents([FromBody] BulkDeleteStudentsRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+        var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (currentUser == null) return Unauthorized();
+
+        if (request.StudentIds == null || !request.StudentIds.Any())
+        {
+            return BadRequest(new { message = "Lista uczniów do usunięcia jest pusta." });
+        }
+
+        var students = await _context.Students
+            .Where(s => request.StudentIds.Contains(s.Id))
+            .ToListAsync();
+
+        if (!students.Any())
+        {
+            return NotFound(new { message = "Nie znaleziono żadnego z podanych uczniów." });
+        }
+
+        // Zabezpieczenie dla Koordynatora
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+            foreach (var student in students)
+            {
+                if (student.GroupId.HasValue)
+                {
+                    if (!await _accessService.CanAccessGroupAsync(currentUser.Id, student.GroupId.Value))
+                    {
+                        return Forbid();
+                    }
+                }
+                else if (student.BranchId.HasValue)
+                {
+                    if (!branchIds.Contains(student.BranchId.Value))
+                    {
+                        return Forbid();
+                    }
+                }
+            }
+        }
+
+        // Zapis do historii dla uczniów przypisanych do grup
+        var now = DateTime.UtcNow;
+        foreach (var student in students)
+        {
+            if (student.GroupId.HasValue)
+            {
+                _context.StudentGroupHistories.Add(new StudentGroupHistory
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = student.Id,
+                    GroupId = student.GroupId.Value,
+                    AcademicYear = "Usunięto ucznia z systemu (masowo)",
+                    ArchivedAt = now,
+                    IsMidYear = true
+                });
+            }
+        }
+
+        _context.Students.RemoveRange(students);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { count = students.Count, message = $"Pomyślnie usunięto {students.Count} uczniów." });
+    }
+
+    // 8b. MASOWA ZMIANA GRUPY UCZNIÓW
+    [HttpPost("bulk-change-group")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> BulkChangeStudentGroup([FromBody] BulkChangeGroupRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+        var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (currentUser == null) return Unauthorized();
+
+        if (request.StudentIds == null || !request.StudentIds.Any())
+        {
+            return BadRequest(new { message = "Lista uczniów do przeniesienia jest pusta." });
+        }
+
+        Guid? targetBranchId = null;
+        if (request.GroupId.HasValue)
+        {
+            var targetGroup = await _context.Groups.FindAsync(request.GroupId.Value);
+            if (targetGroup == null) return BadRequest(new { message = "Docelowa grupa nie istnieje." });
+            targetBranchId = targetGroup.BranchId;
+
+            if (currentUser.Role == UserRole.Coordinator)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, targetGroup.Id))
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        var students = await _context.Students
+            .Where(s => request.StudentIds.Contains(s.Id))
+            .ToListAsync();
+
+        if (!students.Any())
+        {
+            return NotFound(new { message = "Nie znaleziono wybranych uczniów." });
+        }
+
+        // Sprawdzenie uprawnień do dotychczasowych grup/oddziałów
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+            foreach (var student in students)
+            {
+                if (student.GroupId.HasValue)
+                {
+                    if (!await _accessService.CanAccessGroupAsync(currentUser.Id, student.GroupId.Value))
+                    {
+                        return Forbid();
+                    }
+                }
+                else if (student.BranchId.HasValue)
+                {
+                    if (!branchIds.Contains(student.BranchId.Value))
+                    {
+                        return Forbid();
+                    }
+                }
+            }
+        }
+
+        var now = DateTime.UtcNow;
+        var academicYear = !string.IsNullOrWhiteSpace(request.AcademicYear) 
+            ? request.AcademicYear 
+            : "Wypisano w trakcie roku";
+
+        foreach (var student in students)
+        {
+            if (request.RecordHistory && student.GroupId.HasValue && student.GroupId.Value != request.GroupId)
+            {
+                _context.StudentGroupHistories.Add(new StudentGroupHistory
+                {
+                    Id = Guid.NewGuid(),
+                    StudentId = student.Id,
+                    GroupId = student.GroupId.Value,
+                    AcademicYear = academicYear,
+                    ArchivedAt = now,
+                    IsMidYear = request.IsMidYear
+                });
+            }
+
+            student.GroupId = request.GroupId;
+            if (targetBranchId.HasValue)
+            {
+                student.BranchId = targetBranchId.Value;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { count = students.Count, message = $"Zaktualizowano grupę dla {students.Count} uczniów." });
+    }
+
     [HttpGet("group/{groupId}/history")]
     [Authorize]
     public async Task<IActionResult> GetGroupStudentHistory(Guid groupId)

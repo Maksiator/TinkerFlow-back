@@ -309,6 +309,127 @@ public class GroupsController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("bulk-delete")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> BulkDeleteGroups([FromBody] BulkDeleteGroupsRequest request)
+    {
+        var currentUserId = GetCurrentUserId();
+        var userRoleStr = User.FindFirstValue(ClaimTypes.Role);
+
+        if (request.GroupIds == null || !request.GroupIds.Any())
+        {
+            return BadRequest(new { message = "Lista grup do usunięcia jest pusta." });
+        }
+
+        var groups = await _context.Groups
+            .Where(g => request.GroupIds.Contains(g.Id))
+            .ToListAsync();
+
+        if (!groups.Any())
+        {
+            return NotFound(new { message = "Nie znaleziono podanych grup." });
+        }
+
+        // Zabezpieczenie dla Koordynatora
+        if (userRoleStr == "Coordinator")
+        {
+            foreach (var group in groups)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUserId, group.Id))
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        // Sprawdzamy czy którekolwiek z grup mają uczniów
+        var groupsWithStudents = await _context.Students
+            .Where(s => s.GroupId.HasValue && request.GroupIds.Contains(s.GroupId.Value))
+            .Select(s => s.Group!.Name)
+            .Distinct()
+            .ToListAsync();
+
+        if (groupsWithStudents.Any())
+        {
+            return BadRequest(new { message = $"Nie można usunąć grup z przypisanymi uczniami: {string.Join(", ", groupsWithStudents)}. Najpierw przenieś lub wypisz uczniów." });
+        }
+
+        _context.Groups.RemoveRange(groups);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { count = groups.Count, message = $"Pomyślnie usunięto {groups.Count} grup." });
+    }
+
+    [HttpPost("bulk-change-branch")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> BulkChangeGroupBranch([FromBody] BulkChangeBranchRequest request)
+    {
+        var currentUserId = GetCurrentUserId();
+        var userRoleStr = User.FindFirstValue(ClaimTypes.Role);
+
+        if (request.GroupIds == null || !request.GroupIds.Any())
+        {
+            return BadRequest(new { message = "Lista grup jest pusta." });
+        }
+
+        var branchExists = await _context.Branches.AnyAsync(b => b.Id == request.BranchId);
+        if (!branchExists)
+        {
+            return BadRequest(new { message = "Docelowy oddział nie istnieje." });
+        }
+
+        // Sprawdzenie dostępu koordynatora do docelowego oddziału
+        if (userRoleStr == "Coordinator")
+        {
+            var hasAccessToTargetBranch = await _context.UserBranches
+                .AnyAsync(ub => ub.UserId == currentUserId && ub.BranchId == request.BranchId);
+            if (!hasAccessToTargetBranch)
+            {
+                return Forbid();
+            }
+        }
+
+        var groups = await _context.Groups
+            .Where(g => request.GroupIds.Contains(g.Id))
+            .ToListAsync();
+
+        if (!groups.Any())
+        {
+            return NotFound(new { message = "Nie znaleziono podanych grup." });
+        }
+
+        // Sprawdzenie dostępu koordynatora do dotychczasowych grup
+        if (userRoleStr == "Coordinator")
+        {
+            foreach (var group in groups)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUserId, group.Id))
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        foreach (var group in groups)
+        {
+            group.BranchId = request.BranchId;
+        }
+
+        // Aktualizacja BranchId także dla wszystkich uczniów w tych grupach dla spójności
+        var studentsInGroups = await _context.Students
+            .Where(s => s.GroupId.HasValue && request.GroupIds.Contains(s.GroupId.Value))
+            .ToListAsync();
+
+        foreach (var student in studentsInGroups)
+        {
+            student.BranchId = request.BranchId;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { count = groups.Count, message = $"Pomyślnie zmieniono oddział dla {groups.Count} grup." });
+    }
+
     [HttpPost("{id}/archive")]
     [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> ArchiveGroup(Guid id, [FromQuery] string academicYear)

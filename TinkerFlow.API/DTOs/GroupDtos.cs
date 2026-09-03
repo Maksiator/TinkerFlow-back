@@ -26,3 +26,12 @@ public record GroupResponse(
     bool IsArchived = false,
     string? ArchivedAcademicYear = null
 );
+
+public record BulkDeleteGroupsRequest(
+    List<Guid> GroupIds
+);
+
+public record BulkChangeBranchRequest(
+    List<Guid> GroupIds,
+    Guid BranchId
+);

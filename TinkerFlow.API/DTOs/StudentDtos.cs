@@ -46,3 +46,15 @@ public record StudentResponse(
     string? GroupName,
     Guid? BranchId = null
 );
+
+public record BulkDeleteStudentsRequest(
+    List<Guid> StudentIds
+);
+
+public record BulkChangeGroupRequest(
+    List<Guid> StudentIds,
+    Guid? GroupId,
+    bool RecordHistory = true,
+    bool IsMidYear = false,
+    string? AcademicYear = null
+);
