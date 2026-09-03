@@ -4,6 +4,7 @@ using TinkerFlow.Domain.Entities;
 using TinkerFlow.Infrastructure;
 using TinkerFlow.API.DTOs;
 using Microsoft.AspNetCore.Authorization;
+using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure.Services;
 using System.Security.Claims;
 
@@ -60,6 +61,7 @@ public class GroupsController : ControllerBase
             Name = request.Name,
             BranchId = request.BranchId,
             PrimaryTrainerId = request.PrimaryTrainerId,
+            AssignedPrinterId = request.AssignedPrinterId,
             ClassDayOfWeek = request.ClassDayOfWeek
         };
         
@@ -98,6 +100,7 @@ public class GroupsController : ControllerBase
         group.Name = request.Name;
         group.BranchId = request.BranchId;
         group.PrimaryTrainerId = request.PrimaryTrainerId;
+        group.AssignedPrinterId = request.AssignedPrinterId;
         group.ClassDayOfWeek = request.ClassDayOfWeek;
 
         await _context.SaveChangesAsync();
@@ -126,7 +129,9 @@ public class GroupsController : ControllerBase
                 g.IsArchived ? _context.StudentGroupHistories.Count(h => h.GroupId == g.Id && !h.IsMidYear) : g.Students.Count(),
                 g.ClassDayOfWeek,
                 g.IsArchived,
-                g.ArchivedAcademicYear
+                g.ArchivedAcademicYear,
+                g.AssignedPrinterId,
+                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null
             ))
             .FirstOrDefaultAsync();
         
@@ -156,7 +161,9 @@ public class GroupsController : ControllerBase
                 g.IsArchived ? _context.StudentGroupHistories.Count(h => h.GroupId == g.Id && !h.IsMidYear) : g.Students.Count(),
                 g.ClassDayOfWeek,
                 g.IsArchived,
-                g.ArchivedAcademicYear))
+                g.ArchivedAcademicYear,
+                g.AssignedPrinterId,
+                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null))
             .ToListAsync();
 
         return Ok(result);
@@ -428,6 +435,59 @@ public class GroupsController : ControllerBase
         await _context.SaveChangesAsync();
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie zmieniono oddział dla {groups.Count} grup." });
+    }
+
+    [HttpPost("bulk-assign-printer")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> BulkAssignPrinter([FromBody] BulkAssignPrinterRequest request)
+    {
+        var currentUserId = GetCurrentUserId();
+        var userRoleStr = User.FindFirstValue(ClaimTypes.Role);
+
+        if (request.GroupIds == null || !request.GroupIds.Any())
+        {
+            return BadRequest(new { message = "Lista grup jest pusta." });
+        }
+
+        // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer
+        if (request.PrinterId.HasValue)
+        {
+            var printerUser = await _context.Users.FindAsync(request.PrinterId.Value);
+            if (printerUser == null || printerUser.Role != UserRole.Printer)
+            {
+                return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada roli Drukarza." });
+            }
+        }
+
+        var groups = await _context.Groups
+            .Where(g => request.GroupIds.Contains(g.Id))
+            .ToListAsync();
+
+        if (!groups.Any())
+        {
+            return NotFound(new { message = "Nie znaleziono podanych grup." });
+        }
+
+        // Sprawdzenie dostępu koordynatora do grup
+        if (userRoleStr == "Coordinator")
+        {
+            foreach (var group in groups)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUserId, group.Id))
+                {
+                    return Forbid();
+                }
+            }
+        }
+
+        foreach (var group in groups)
+        {
+            group.AssignedPrinterId = request.PrinterId;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { count = groups.Count, message = $"Pomyślnie zaktualizowano przypisanego drukarza dla {groups.Count} grup." });
     }
 
     [HttpPost("{id}/archive")]

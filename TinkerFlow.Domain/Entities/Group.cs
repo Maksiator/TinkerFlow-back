@@ -11,6 +11,9 @@ public class Group
     public Guid? PrimaryTrainerId { get; set; }
     public User? PrimaryTrainer { get; set; }
     
+    public Guid? AssignedPrinterId { get; set; }
+    public User? AssignedPrinter { get; set; }
+    
     
     public ICollection<Student> Students { get; set; } = new List<Student>();
     public ICollection<GroupSubstitute> Substitutes { get; set; } = new List<GroupSubstitute>(); // Zastępstwa dla tej grupy

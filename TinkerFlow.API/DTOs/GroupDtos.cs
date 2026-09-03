@@ -4,14 +4,16 @@ public record CreateGroupRequest(
     string Name,
     Guid BranchId,
     DayOfWeek? ClassDayOfWeek,
-    Guid? PrimaryTrainerId = null
+    Guid? PrimaryTrainerId = null,
+    Guid? AssignedPrinterId = null
 );
 
 public record UpdateGroupRequest(
     string Name,
     Guid BranchId,
     DayOfWeek? ClassDayOfWeek,
-    Guid? PrimaryTrainerId = null
+    Guid? PrimaryTrainerId = null,
+    Guid? AssignedPrinterId = null
 );
 
 public record GroupResponse(
@@ -24,8 +26,26 @@ public record GroupResponse(
     int StudentCount,
     DayOfWeek? ClassDayOfWeek = null,
     bool IsArchived = false,
-    string? ArchivedAcademicYear = null
-);
+    string? ArchivedAcademicYear = null,
+    Guid? AssignedPrinterId = null,
+    string? AssignedPrinterName = null
+)
+{
+    public GroupResponse(
+        Guid id,
+        string name,
+        Guid branchId,
+        string branchName,
+        Guid? primaryTrainerId,
+        string? primaryTrainerName,
+        int studentCount,
+        DayOfWeek? classDayOfWeek,
+        bool isArchived,
+        string? archivedAcademicYear)
+        : this(id, name, branchId, branchName, primaryTrainerId, primaryTrainerName, studentCount, classDayOfWeek, isArchived, archivedAcademicYear, null, null)
+    {
+    }
+}
 
 public record BulkDeleteGroupsRequest(
     List<Guid> GroupIds
@@ -34,4 +54,9 @@ public record BulkDeleteGroupsRequest(
 public record BulkChangeBranchRequest(
     List<Guid> GroupIds,
     Guid BranchId
+);
+
+public record BulkAssignPrinterRequest(
+    List<Guid> GroupIds,
+    Guid? PrinterId
 );

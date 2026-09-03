@@ -67,6 +67,13 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             .HasForeignKey(g => g.PrimaryTrainerId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // 4a. Relacja Group -> AssignedPrinter
+        builder.Entity<Group>()
+            .HasOne(g => g.AssignedPrinter)
+            .WithMany(u => u.AssignedPrinterGroups)
+            .HasForeignKey(g => g.AssignedPrinterId)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // 5. Relacja GroupSubstitute -> Group & Trainer
         builder.Entity<GroupSubstitute>()
             .HasOne(gs => gs.Group)

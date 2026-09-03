@@ -19,4 +19,5 @@ public class User : IdentityUser<Guid>
     public ICollection<UserBranch> UserBranches { get; set; } = new List<UserBranch>(); // Do jakich oddziałów należy
     public ICollection<Group> PrimaryGroups { get; set; } = new List<Group>(); // Grupy, w których jest głównym trenerem
     public ICollection<GroupSubstitute> SubstituteAssignments { get; set; } = new List<GroupSubstitute>(); // Jego zastępstwa
+    public ICollection<Group> AssignedPrinterGroups { get; set; } = new List<Group>(); // Grupy, dla których jest drukarzem
 }

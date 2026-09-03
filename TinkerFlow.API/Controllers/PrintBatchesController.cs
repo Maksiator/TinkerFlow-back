@@ -171,8 +171,13 @@ public class PrintBatchesController : ControllerBase
                     .ThenInclude(sp => sp!.Project) 
             .AsQueryable();
 
-        // Jeśli użytkownik nie jest administratorem, filtrujemy zlecenia tylko z jego oddziałów
-        if (user.Role != UserRole.Admin)
+        // Jeśli użytkownik nie jest administratorem, filtrujemy zlecenia
+        if (user.Role == UserRole.Printer)
+        {
+            // Drukarz widzi tylko paczki z grup bezpośrednio do niego przypisanych
+            query = query.Where(pb => pb.Group != null && pb.Group.AssignedPrinterId == user.Id);
+        }
+        else if (user.Role != UserRole.Admin)
         {
             var allowedBranchIds = user.UserBranches.Select(ub => ub.BranchId).ToList();
             query = query.Where(pb => pb.Group != null && allowedBranchIds.Contains(pb.Group.BranchId));

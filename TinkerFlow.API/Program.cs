@@ -194,9 +194,20 @@ app.Use(async (context, next) =>
 
 app.MapControllers();
 
-// --- SEEDOWANIE PIERWSZEGO ADMINA ---
+// --- AUTOMATYCZNA MIGRACJA I SEEDOWANIE PIERWSZEGO ADMINA ---
 using (var scope = app.Services.CreateScope())
 {
+    var context = scope.ServiceProvider.GetRequiredService<TinkerFlowDbContext>();
+    try
+    {
+        await context.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "Wystąpił błąd podczas automatycznej migracji bazy danych.");
+    }
+
     var userManager = scope.ServiceProvider.GetRequiredService<UserManager<User>>();
     
     var adminEmail = "admin@tinkerflow.com";
