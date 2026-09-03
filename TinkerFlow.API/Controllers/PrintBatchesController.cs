@@ -222,7 +222,8 @@ public class PrintBatchesController : ControllerBase
             )).ToList(),
             pb.CreatedAt,
             pb.Group?.AssignedPrinterId,
-            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null
+            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
+            pb.Group?.ClassDayOfWeek
         )).ToList();
 
         return Ok(response);

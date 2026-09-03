@@ -40,7 +40,8 @@ public record PrintBatchResponse(
     List<PrintJobResponse> PrintJobs,
     DateTime CreatedAt,
     Guid? AssignedPrinterId = null,
-    string? AssignedPrinterName = null
+    string? AssignedPrinterName = null,
+    DayOfWeek? ClassDayOfWeek = null
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu
