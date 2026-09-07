@@ -6,6 +6,7 @@ using Microsoft.Extensions.Caching.Memory;
 using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
 using System.Text;
+using TinkerFlow.API.Extensions;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Infrastructure;
 using TinkerFlow.Infrastructure.Services;
@@ -36,7 +37,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(httpContext =>
         RateLimitPartition.GetFixedWindowLimiter(
-            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            partitionKey: httpContext.GetClientIpAddress(),
             factory: partition => new FixedWindowRateLimiterOptions
             {
                 AutoReplenishment = true,

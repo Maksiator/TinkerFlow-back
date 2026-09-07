@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TinkerFlow.API.DTOs;
+using TinkerFlow.API.Extensions;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure;
@@ -325,7 +326,7 @@ public class StudentsController : ControllerBase
             $"Dodano ucznia {newStudent.FirstName} {newStudent.LastName}" + (groupName != null ? $" do grupy '{groupName}'" : ""),
             entityId: newStudent.Id,
             entityName: $"{newStudent.FirstName} {newStudent.LastName}",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
         
         var response = new StudentResponse(
             newStudent.Id, newStudent.FirstName, newStudent.LastName, newStudent.DateOfBirth,
@@ -423,7 +424,7 @@ public class StudentsController : ControllerBase
             $"Zaktualizowano dane ucznia {existingStudent.FirstName} {existingStudent.LastName}",
             entityId: existingStudent.Id,
             entityName: $"{existingStudent.FirstName} {existingStudent.LastName}",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return NoContent();
     }
@@ -538,7 +539,7 @@ public class StudentsController : ControllerBase
             $"Usunięto ucznia {student.FirstName} {student.LastName}",
             entityId: student.Id,
             entityName: $"{student.FirstName} {student.LastName}",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return NoContent();
     }
@@ -615,7 +616,7 @@ public class StudentsController : ControllerBase
             "Students",
             "BulkDeleteStudents",
             $"Usunięto masowo {students.Count} uczniów",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { count = students.Count, message = $"Pomyślnie usunięto {students.Count} uczniów." });
     }
@@ -716,7 +717,7 @@ public class StudentsController : ControllerBase
             "Students",
             "BulkChangeGroup",
             $"Zmieniono grupę dla {students.Count} uczniów",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { count = students.Count, message = $"Zaktualizowano grupę dla {students.Count} uczniów." });
     }
@@ -867,7 +868,7 @@ public class StudentsController : ControllerBase
                 "Students",
                 "ImportStudents",
                 $"Zaimportowano / dodano masowo {newStudents.Count} uczniów",
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+                ipAddress: HttpContext.GetClientIpAddress());
         }
 
         return Ok(new { message = $"Pomyślnie zaimportowano {newStudents.Count} nowych uczniów. (Pominięto duplikaty, jeśli były)." });

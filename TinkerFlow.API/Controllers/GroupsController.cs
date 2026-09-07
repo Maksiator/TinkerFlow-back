@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Infrastructure;
 using TinkerFlow.API.DTOs;
+using TinkerFlow.API.Extensions;
 using Microsoft.AspNetCore.Authorization;
 using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure.Services;
@@ -81,7 +82,7 @@ public class GroupsController : ControllerBase
             entityName: newGroup.Name,
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
         
         return CreatedAtAction(nameof(GetGroup), new { id = newGroup.Id }, new { id = newGroup.Id });
     }
@@ -128,7 +129,7 @@ public class GroupsController : ControllerBase
             entityName: group.Name,
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
         
         return NoContent();
     }
@@ -346,7 +347,7 @@ public class GroupsController : ControllerBase
             entityName: group.Name,
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
         
         return NoContent();
     }
@@ -405,7 +406,7 @@ public class GroupsController : ControllerBase
             $"Usunięto masowo {groups.Count} grup: {string.Join(", ", groups.Select(g => g.Name))}",
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie usunięto {groups.Count} grup." });
     }
@@ -483,7 +484,7 @@ public class GroupsController : ControllerBase
             $"Zmieniono oddział dla {groups.Count} grup na '{branchExists}'",
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie zmieniono oddział dla {groups.Count} grup." });
     }
@@ -546,7 +547,7 @@ public class GroupsController : ControllerBase
             $"Przypisano drukarza: {(printerName ?? "Brak przypisania")} dla {groups.Count} grup",
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie zaktualizowano przypisanego drukarza dla {groups.Count} grup." });
     }
@@ -606,7 +607,7 @@ public class GroupsController : ControllerBase
             entityName: group.Name,
             userId: currentUserId,
             userRole: userRoleStr,
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
         
         return Ok(new { message = "Grupa została pomyślnie zarchiwizowana." });
     }

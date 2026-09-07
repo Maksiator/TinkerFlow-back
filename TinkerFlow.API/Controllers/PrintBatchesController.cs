@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using System.Security.Claims;
 using TinkerFlow.Api.DTOs;
+using TinkerFlow.API.Extensions;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure; 
@@ -142,7 +143,7 @@ public class PrintBatchesController : ControllerBase
                 entityId: batch.Id,
                 entityName: groupName,
                 userId: trainerId,
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+                ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new { 
                 message = "Paczka wysłana pomyślnie na farmę.", 
@@ -291,7 +292,7 @@ public class PrintBatchesController : ControllerBase
                 "UpdateBatchStatus",
                 $"Zmieniono status paczki na: {request.Status}",
                 entityId: batch.Id,
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+                ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new { message = "Status paczki i wydruków zaktualizowany.", newStatus = batch.Status });
         }
@@ -583,7 +584,7 @@ public class PrintBatchesController : ControllerBase
                 "DeleteBatch",
                 $"Usunięto paczkę wydruków ({batch.PrintJobs.Count} modeli)",
                 entityId: batch.Id,
-                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+                ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new { message = "Paczka została trwale usunięta." });
         }

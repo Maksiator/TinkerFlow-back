@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using TinkerFlow.API.DTOs;
+using TinkerFlow.API.Extensions;
 using TinkerFlow.Domain.Entities;
 
 namespace TinkerFlow.API.Controllers;
@@ -30,7 +31,7 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var ipAddress = HttpContext.GetClientIpAddress();
 
         var user = await _userManager.FindByEmailAsync(request.Email);
         if (user == null)

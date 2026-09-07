@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TinkerFlow.API.DTOs;
+using TinkerFlow.API.Extensions;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure; // Potrzebne do TinkerFlowDbContext
@@ -172,7 +173,7 @@ public async Task<IActionResult> GetUsers(
             userEmail: currentUser.Email,
             userName: $"{currentUser.FirstName} {currentUser.LastName}",
             userRole: currentUser.Role.ToString(),
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword));
     }
@@ -269,7 +270,7 @@ public async Task<IActionResult> GetUsers(
             userEmail: currentUser.Email,
             userName: $"{currentUser.FirstName} {currentUser.LastName}",
             userRole: currentUser.Role.ToString(),
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword));
     }
@@ -326,7 +327,7 @@ public async Task<IActionResult> GetUsers(
             user.IsActive ? $"Odblokowano konto pracownika {user.FirstName} {user.LastName}" : $"Zablokowano konto pracownika {user.FirstName} {user.LastName}",
             entityId: user.Id,
             entityName: $"{user.FirstName} {user.LastName}",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { message = user.IsActive ? "Konto zostało odblokowane." : "Konto zostało zablokowane." });
     }
@@ -382,7 +383,7 @@ public async Task<IActionResult> GetUsers(
             $"Trwale usunięto pracownika {user.FirstName} {user.LastName} ({user.Email}), rola: {user.Role}",
             entityId: user.Id,
             entityName: $"{user.FirstName} {user.LastName}",
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return NoContent();
     }
@@ -415,7 +416,7 @@ public async Task<IActionResult> GetUsers(
             userEmail: user.Email,
             userName: $"{user.FirstName} {user.LastName}",
             userRole: user.Role.ToString(),
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { message = "Hasło zostało pomyślnie zmienione." });
     }
@@ -510,7 +511,7 @@ public async Task<IActionResult> GetUsers(
             userEmail: currentUser.Email,
             userName: $"{currentUser.FirstName} {currentUser.LastName}",
             userRole: currentUser.Role.ToString(),
-            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+            ipAddress: HttpContext.GetClientIpAddress());
 
         return Ok(new { message = "Hasło tymczasowe zostało pomyślnie ustawione." });
     }
