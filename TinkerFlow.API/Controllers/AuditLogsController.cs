@@ -7,7 +7,9 @@ using TinkerFlow.Infrastructure;
 namespace TinkerFlow.API.Controllers;
 
 [ApiController]
+[Route("api/[controller]")]
 [Route("api/audit-logs")]
+[Route("api/auditlogs")]
 [Authorize(Roles = "Admin")]
 public class AuditLogsController : ControllerBase
 {

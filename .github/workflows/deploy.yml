@@ -59,7 +59,7 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY }}
           port: 22
           source: "docker-compose.prod.yml"
-          target: "~/tinkerflow"
+          target: "tinkerflow"
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -77,6 +77,6 @@ jobs:
             # Pobranie najnowszego obrazu
             docker compose pull api backup
             # Restart serwisów bazy, api i backupu
-            docker compose up -d db api backup
+            docker compose up -d --force-recreate db api backup
             # Usunięcie starych nieużywanych obrazów (cleanup)
             docker image prune -f
