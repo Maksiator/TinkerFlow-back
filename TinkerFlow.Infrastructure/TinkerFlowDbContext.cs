@@ -26,6 +26,7 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
     public DbSet<PrintJob> PrintJobs { get; set; }
     public DbSet<TrainerGroupListItem> TrainerGroupListItems { get; set; }
     public DbSet<StudentGroupHistory> StudentGroupHistories { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder); // KRYTYCZNE
@@ -109,5 +110,14 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             .WithMany()
             .HasForeignKey(s => s.BranchId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // 7. Indeksy dla AuditLog
+        builder.Entity<AuditLog>(entity =>
+        {
+            entity.HasIndex(a => a.Timestamp);
+            entity.HasIndex(a => a.Category);
+            entity.HasIndex(a => a.UserId);
+            entity.HasIndex(a => new { a.Category, a.Timestamp });
+        });
     }
 }

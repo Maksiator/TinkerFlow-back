@@ -17,11 +17,13 @@ public class PrintBatchesController : ControllerBase
 {
     private readonly TinkerFlowDbContext _context;
     private readonly ILogger<PrintBatchesController> _logger;
+    private readonly TinkerFlow.Infrastructure.Services.IAuditLogService _auditLogService;
 
-    public PrintBatchesController(TinkerFlowDbContext context, ILogger<PrintBatchesController> logger)
+    public PrintBatchesController(TinkerFlowDbContext context, ILogger<PrintBatchesController> logger, TinkerFlow.Infrastructure.Services.IAuditLogService auditLogService)
     {
         _context = context;
         _logger = logger;
+        _auditLogService = auditLogService;
     }
 
     [HttpPost("send-to-farm")]
@@ -131,6 +133,16 @@ public class PrintBatchesController : ControllerBase
             await transaction.CommitAsync();
 
             _logger.LogInformation("Pomyślnie utworzono PrintBatch {BatchId} dla grupy {GroupId}.", batch.Id, request.GroupId);
+
+            var groupName = await _context.Groups.Where(g => g.Id == request.GroupId).Select(g => g.Name).FirstOrDefaultAsync() ?? "Grupa";
+            await _auditLogService.LogAsync(
+                "PrintBatches",
+                "SendToFarm",
+                $"Trener wysłał paczkę ({batch.PrintJobs.Count} projektów) dla grupy '{groupName}'",
+                entityId: batch.Id,
+                entityName: groupName,
+                userId: trainerId,
+                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
             return Ok(new { 
                 message = "Paczka wysłana pomyślnie na farmę.", 
@@ -273,6 +285,14 @@ public class PrintBatchesController : ControllerBase
             await transaction.CommitAsync();
 
             _logger.LogInformation("Zmieniono status paczki {BatchId} na {Status} oraz masowo zaktualizowano jej wydruki.", batchId, request.Status);
+
+            await _auditLogService.LogAsync(
+                "PrintBatches",
+                "UpdateBatchStatus",
+                $"Zmieniono status paczki na: {request.Status}",
+                entityId: batch.Id,
+                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
             return Ok(new { message = "Status paczki i wydruków zaktualizowany.", newStatus = batch.Status });
         }
         catch (Exception ex)
@@ -557,6 +577,14 @@ public class PrintBatchesController : ControllerBase
             await transaction.CommitAsync();
 
             _logger.LogInformation("Drukarz/Admin usunął paczkę {BatchId}", batchId);
+
+            await _auditLogService.LogAsync(
+                "PrintBatches",
+                "DeleteBatch",
+                $"Usunięto paczkę wydruków ({batch.PrintJobs.Count} modeli)",
+                entityId: batch.Id,
+                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
             return Ok(new { message = "Paczka została trwale usunięta." });
         }
         catch (Exception ex)

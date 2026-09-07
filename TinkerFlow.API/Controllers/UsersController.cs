@@ -6,6 +6,7 @@ using TinkerFlow.API.DTOs;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure; // Potrzebne do TinkerFlowDbContext
+using TinkerFlow.Infrastructure.Services;
 
 namespace TinkerFlow.API.Controllers;
 
@@ -16,11 +17,13 @@ public class UsersController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
     private readonly TinkerFlowDbContext _context; // NOWE: Wstrzykujemy kontekst bazy
+    private readonly IAuditLogService _auditLogService;
 
-    public UsersController(UserManager<User> userManager, TinkerFlowDbContext context)
+    public UsersController(UserManager<User> userManager, TinkerFlowDbContext context, IAuditLogService auditLogService)
     {
         _userManager = userManager;
         _context = context;
+        _auditLogService = auditLogService;
     }
 
     [HttpGet]
@@ -159,6 +162,18 @@ public async Task<IActionResult> GetUsers(
             await _context.SaveChangesAsync();
         }
 
+        await _auditLogService.LogAsync(
+            "Users",
+            "CreateUser",
+            $"Utworzono konto pracownika {user.FirstName} {user.LastName} ({user.Email}), rola: {user.Role}",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            userId: currentUser.Id,
+            userEmail: currentUser.Email,
+            userName: $"{currentUser.FirstName} {currentUser.LastName}",
+            userRole: currentUser.Role.ToString(),
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword));
     }
 
@@ -244,6 +259,18 @@ public async Task<IActionResult> GetUsers(
             .Select(ub => new UserBranchDto(ub.BranchId, ub.Branch.Name))
             .ToListAsync();
 
+        await _auditLogService.LogAsync(
+            "Users",
+            "UpdateUser",
+            $"Zaktualizowano dane pracownika {user.FirstName} {user.LastName} (rola: {user.Role})",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            userId: currentUser.Id,
+            userEmail: currentUser.Email,
+            userName: $"{currentUser.FirstName} {currentUser.LastName}",
+            userRole: currentUser.Role.ToString(),
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword));
     }
     
@@ -293,6 +320,14 @@ public async Task<IActionResult> GetUsers(
 
         if (!result.Succeeded) return BadRequest(result.Errors);
 
+        await _auditLogService.LogAsync(
+            "Users",
+            "ToggleStatus",
+            user.IsActive ? $"Odblokowano konto pracownika {user.FirstName} {user.LastName}" : $"Zablokowano konto pracownika {user.FirstName} {user.LastName}",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return Ok(new { message = user.IsActive ? "Konto zostało odblokowane." : "Konto zostało zablokowane." });
     }
 
@@ -341,6 +376,14 @@ public async Task<IActionResult> GetUsers(
         var result = await _userManager.DeleteAsync(user);
         if (!result.Succeeded) return BadRequest(result.Errors);
 
+        await _auditLogService.LogAsync(
+            "Users",
+            "DeleteUser",
+            $"Trwale usunięto pracownika {user.FirstName} {user.LastName} ({user.Email}), rola: {user.Role}",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return NoContent();
     }
 
@@ -363,6 +406,16 @@ public async Task<IActionResult> GetUsers(
 
         user.MustChangePassword = false;
         await _userManager.UpdateAsync(user);
+
+        await _auditLogService.LogAsync(
+            "Auth",
+            "PasswordChanged",
+            "Użytkownik zmienił własne hasło",
+            userId: user.Id,
+            userEmail: user.Email,
+            userName: $"{user.FirstName} {user.LastName}",
+            userRole: user.Role.ToString(),
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { message = "Hasło zostało pomyślnie zmienione." });
     }
@@ -446,6 +499,18 @@ public async Task<IActionResult> GetUsers(
 
         user.MustChangePassword = true;
         await _userManager.UpdateAsync(user);
+
+        await _auditLogService.LogAsync(
+            "Users",
+            "ResetPassword",
+            $"Zresetowano hasło tymczasowe pracownika {user.FirstName} {user.LastName}",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            userId: currentUser.Id,
+            userEmail: currentUser.Email,
+            userName: $"{currentUser.FirstName} {currentUser.LastName}",
+            userRole: currentUser.Role.ToString(),
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { message = "Hasło tymczasowe zostało pomyślnie ustawione." });
     }

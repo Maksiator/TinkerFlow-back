@@ -15,31 +15,40 @@ public class AuthController : ControllerBase
 {
     private readonly UserManager<User> _userManager;
     private readonly IConfiguration _configuration;
+    private readonly TinkerFlow.Infrastructure.Services.IAuditLogService _auditLogService;
 
-    public AuthController(UserManager<User> userManager, IConfiguration configuration)
+    public AuthController(
+        UserManager<User> userManager,
+        IConfiguration configuration,
+        TinkerFlow.Infrastructure.Services.IAuditLogService auditLogService)
     {
         _userManager = userManager;
         _configuration = configuration;
+        _auditLogService = auditLogService;
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
 
         var user = await _userManager.FindByEmailAsync(request.Email);
         if (user == null)
         {
+            await _auditLogService.LogAsync("Auth", "LoginFailed", $"Nieudana próba logowania (nieistniejący email: {request.Email})", userEmail: request.Email, ipAddress: ipAddress);
             return Unauthorized(new { message = "Nieprawidłowy email lub hasło." });
         }
         
         if (!user.IsActive)
         {
+            await _auditLogService.LogAsync("Auth", "LoginBlocked", "Próba logowania na zablokowane konto", userId: user.Id, userEmail: user.Email, userName: $"{user.FirstName} {user.LastName}", userRole: user.Role.ToString(), ipAddress: ipAddress);
             return Unauthorized(new { message = "Twoje konto zostało zablokowane. Skontaktuj się z administratorem." });
         }
         
         var isPasswordValid = await _userManager.CheckPasswordAsync(user, request.Password);
         if (!isPasswordValid)
         {
+            await _auditLogService.LogAsync("Auth", "LoginFailed", "Błędne hasło podczas logowania", userId: user.Id, userEmail: user.Email, userName: $"{user.FirstName} {user.LastName}", userRole: user.Role.ToString(), ipAddress: ipAddress);
             return Unauthorized(new { message = "Nieprawidłowy email lub hasło." });
         }
         
@@ -54,6 +63,8 @@ public class AuthController : ControllerBase
             Secure = cookieSecure
         };
         Response.Cookies.Append("tinkerflow_token", token, cookieOptions);
+
+        await _auditLogService.LogAsync("Auth", "LoginSuccess", "Pomyślne logowanie do systemu", userId: user.Id, userEmail: user.Email, userName: $"{user.FirstName} {user.LastName}", userRole: user.Role.ToString(), ipAddress: ipAddress);
         
         return Ok(new AuthResponse(token, user.Id, user.FirstName, user.LastName, user.Role, user.MustChangePassword));
     }

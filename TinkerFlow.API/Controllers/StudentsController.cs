@@ -17,13 +17,19 @@ public class StudentsController : ControllerBase
 {
     private readonly TinkerFlowDbContext _context; 
     private readonly UserManager<User> _userManager; 
-    private readonly IGroupAccessService _accessService; // ZMIANA 2: Wstrzyknięty serwis
+    private readonly IGroupAccessService _accessService;
+    private readonly IAuditLogService _auditLogService;
     
-    public StudentsController(TinkerFlowDbContext context, UserManager<User> userManager, IGroupAccessService accessService)
+    public StudentsController(
+        TinkerFlowDbContext context,
+        UserManager<User> userManager,
+        IGroupAccessService accessService,
+        IAuditLogService auditLogService)
     {
         _context = context;
         _userManager = userManager;
         _accessService = accessService;
+        _auditLogService = auditLogService;
     }
 
     // POMOCNICZA METODA: Pobiera oddziały Koordynatora
@@ -312,6 +318,14 @@ public class StudentsController : ControllerBase
         var groupName = request.GroupId.HasValue
             ? await _context.Groups.Where(g => g.Id == request.GroupId.Value).Select(g => g.Name).FirstOrDefaultAsync()
             : null;
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "CreateStudent",
+            $"Dodano ucznia {newStudent.FirstName} {newStudent.LastName}" + (groupName != null ? $" do grupy '{groupName}'" : ""),
+            entityId: newStudent.Id,
+            entityName: $"{newStudent.FirstName} {newStudent.LastName}",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         
         var response = new StudentResponse(
             newStudent.Id, newStudent.FirstName, newStudent.LastName, newStudent.DateOfBirth,
@@ -402,6 +416,15 @@ public class StudentsController : ControllerBase
         existingStudent.BranchId = resolvedBranchId;
         
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "UpdateStudent",
+            $"Zaktualizowano dane ucznia {existingStudent.FirstName} {existingStudent.LastName}",
+            entityId: existingStudent.Id,
+            entityName: $"{existingStudent.FirstName} {existingStudent.LastName}",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return NoContent();
     }
     
@@ -508,6 +531,15 @@ public class StudentsController : ControllerBase
 
         _context.Students.Remove(student);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "DeleteStudent",
+            $"Usunięto ucznia {student.FirstName} {student.LastName}",
+            entityId: student.Id,
+            entityName: $"{student.FirstName} {student.LastName}",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return NoContent();
     }
 
@@ -578,6 +610,12 @@ public class StudentsController : ControllerBase
 
         _context.Students.RemoveRange(students);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "BulkDeleteStudents",
+            $"Usunięto masowo {students.Count} uczniów",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { count = students.Count, message = $"Pomyślnie usunięto {students.Count} uczniów." });
     }
@@ -673,6 +711,12 @@ public class StudentsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "BulkChangeGroup",
+            $"Zmieniono grupę dla {students.Count} uczniów",
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { count = students.Count, message = $"Zaktualizowano grupę dla {students.Count} uczniów." });
     }
@@ -818,6 +862,12 @@ public class StudentsController : ControllerBase
         {
             _context.Students.AddRange(newStudents);
             await _context.SaveChangesAsync();
+
+            await _auditLogService.LogAsync(
+                "Students",
+                "ImportStudents",
+                $"Zaimportowano / dodano masowo {newStudents.Count} uczniów",
+                ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         }
 
         return Ok(new { message = $"Pomyślnie zaimportowano {newStudents.Count} nowych uczniów. (Pominięto duplikaty, jeśli były)." });

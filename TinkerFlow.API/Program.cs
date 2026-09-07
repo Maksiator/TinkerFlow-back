@@ -5,10 +5,6 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Caching.Memory;
 using System.Threading.RateLimiting;
 using Scalar.AspNetCore;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
 using System.Text;
 using TinkerFlow.Domain.Entities;
 using TinkerFlow.Infrastructure;
@@ -59,6 +55,7 @@ builder.Services.AddDbContext<TinkerFlowDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IGroupAccessService, GroupAccessService>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 builder.Services.AddIdentityCore<User>(options =>
 {

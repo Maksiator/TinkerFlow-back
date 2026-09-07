@@ -17,11 +17,16 @@ public class GroupsController : ControllerBase
 {
     private readonly TinkerFlowDbContext _context;
     private readonly IGroupAccessService _accessService; 
+    private readonly IAuditLogService _auditLogService;
 
-    public GroupsController(TinkerFlowDbContext context, IGroupAccessService accessService)
+    public GroupsController(
+        TinkerFlowDbContext context,
+        IGroupAccessService accessService,
+        IAuditLogService auditLogService)
     {
         _context = context;
         _accessService = accessService;
+        _auditLogService = auditLogService;
     }
     
     private Guid GetCurrentUserId()
@@ -67,6 +72,16 @@ public class GroupsController : ControllerBase
         
         _context.Groups.Add(newGroup);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "CreateGroup",
+            $"Utworzono grupę '{newGroup.Name}'",
+            entityId: newGroup.Id,
+            entityName: newGroup.Name,
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         
         return CreatedAtAction(nameof(GetGroup), new { id = newGroup.Id }, new { id = newGroup.Id });
     }
@@ -104,6 +119,16 @@ public class GroupsController : ControllerBase
         group.ClassDayOfWeek = request.ClassDayOfWeek;
 
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "UpdateGroup",
+            $"Zaktualizowano dane grupy '{group.Name}'",
+            entityId: group.Id,
+            entityName: group.Name,
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         
         return NoContent();
     }
@@ -312,6 +337,16 @@ public class GroupsController : ControllerBase
         
         _context.Groups.Remove(group);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "DeleteGroup",
+            $"Usunięto grupę '{group.Name}'",
+            entityId: group.Id,
+            entityName: group.Name,
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         
         return NoContent();
     }
@@ -363,6 +398,14 @@ public class GroupsController : ControllerBase
 
         _context.Groups.RemoveRange(groups);
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "BulkDeleteGroups",
+            $"Usunięto masowo {groups.Count} grup: {string.Join(", ", groups.Select(g => g.Name))}",
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie usunięto {groups.Count} grup." });
     }
@@ -434,6 +477,14 @@ public class GroupsController : ControllerBase
 
         await _context.SaveChangesAsync();
 
+        await _auditLogService.LogAsync(
+            "Groups",
+            "BulkChangeBranch",
+            $"Zmieniono oddział dla {groups.Count} grup na '{branchExists}'",
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
+
         return Ok(new { count = groups.Count, message = $"Pomyślnie zmieniono oddział dla {groups.Count} grup." });
     }
 
@@ -449,6 +500,7 @@ public class GroupsController : ControllerBase
             return BadRequest(new { message = "Lista grup jest pusta." });
         }
 
+        string? printerName = null;
         // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer
         if (request.PrinterId.HasValue)
         {
@@ -457,6 +509,7 @@ public class GroupsController : ControllerBase
             {
                 return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada roli Drukarza." });
             }
+            printerName = $"{printerUser.FirstName} {printerUser.LastName}";
         }
 
         var groups = await _context.Groups
@@ -486,6 +539,14 @@ public class GroupsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "BulkAssignPrinter",
+            $"Przypisano drukarza: {(printerName ?? "Brak przypisania")} dla {groups.Count} grup",
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
 
         return Ok(new { count = groups.Count, message = $"Pomyślnie zaktualizowano przypisanego drukarza dla {groups.Count} grup." });
     }
@@ -536,6 +597,16 @@ public class GroupsController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Groups",
+            "ArchiveGroup",
+            $"Zarchiwizowano grupę '{group.Name}' dla roku {academicYear}",
+            entityId: group.Id,
+            entityName: group.Name,
+            userId: currentUserId,
+            userRole: userRoleStr,
+            ipAddress: HttpContext.Connection.RemoteIpAddress?.ToString());
         
         return Ok(new { message = "Grupa została pomyślnie zarchiwizowana." });
     }
