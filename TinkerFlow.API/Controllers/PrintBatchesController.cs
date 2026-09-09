@@ -159,6 +159,94 @@ public class PrintBatchesController : ControllerBase
         }
     }
 
+    [HttpPost("report-no-prints")]
+    public async Task<IActionResult> ReportNoPrints([FromBody] ReportNoPrintsRequest request)
+    {
+        if (!ModelState.IsValid)
+            return BadRequest(ModelState);
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out Guid trainerId))
+        {
+            return Unauthorized(new { message = "Sesja wygasła lub jest nieprawidłowa. Zaloguj się ponownie." });
+        }
+
+        var group = await _context.Groups
+            .Include(g => g.Branch)
+            .FirstOrDefaultAsync(g => g.Id == request.GroupId);
+
+        if (group == null)
+        {
+            return NotFound(new { message = "Podana grupa nie istnieje w systemie." });
+        }
+
+        var lessonDateUtc = DateTime.SpecifyKind(request.LessonDate.Date, DateTimeKind.Utc);
+
+        var noteContent = !string.IsNullOrWhiteSpace(request.AdditionalNotes)
+            ? $"{request.Reason}: {request.AdditionalNotes.Trim()}"
+            : request.Reason;
+
+        // Sprawdzamy czy dla tej grupy w tym dniu już nie zgłoszono braku wydruków
+        var existingNoPrints = await _context.PrintBatches
+            .FirstOrDefaultAsync(b => b.GroupId == request.GroupId && b.LessonDate == lessonDateUtc && b.Status == PrintBatchState.NoPrints);
+
+        if (existingNoPrints != null)
+        {
+            existingNoPrints.Notes = noteContent;
+            existingNoPrints.CreatedAt = DateTime.UtcNow;
+            existingNoPrints.CreatedByTrainerId = trainerId;
+            await _context.SaveChangesAsync();
+
+            await _auditLogService.LogAsync(
+                "PrintBatches",
+                "ReportNoPrints",
+                $"Trener zaktualizował zgłoszenie braku wydruków dla grupy '{group.Name}' ({noteContent})",
+                entityId: existingNoPrints.Id,
+                entityName: group.Name,
+                userId: trainerId,
+                ipAddress: HttpContext.GetClientIpAddress());
+
+            return Ok(new
+            {
+                message = "Zaktualizowano informację o braku projektów do druku.",
+                batchId = existingNoPrints.Id
+            });
+        }
+
+        var batch = new PrintBatch
+        {
+            Id = Guid.NewGuid(),
+            GroupId = request.GroupId,
+            LessonDate = lessonDateUtc,
+            Deadline = lessonDateUtc,
+            Notes = noteContent,
+            CreatedAt = DateTime.UtcNow,
+            CreatedByTrainerId = trainerId,
+            Status = PrintBatchState.NoPrints,
+            PrintJobs = new List<PrintJob>()
+        };
+
+        _context.PrintBatches.Add(batch);
+        await _context.SaveChangesAsync();
+
+        _logger.LogInformation("Trener {TrainerId} zgłosił brak wydruków dla grupy {GroupId} ({Notes}).", trainerId, request.GroupId, noteContent);
+
+        await _auditLogService.LogAsync(
+            "PrintBatches",
+            "ReportNoPrints",
+            $"Trener zgłosił brak wydruków dla grupy '{group.Name}' ({noteContent})",
+            entityId: batch.Id,
+            entityName: group.Name,
+            userId: trainerId,
+            ipAddress: HttpContext.GetClientIpAddress());
+
+        return Ok(new
+        {
+            message = "Poinformowano drukarza o braku projektów do druku.",
+            batchId = batch.Id
+        });
+    }
+
     [HttpGet("farm")]
     public async Task<IActionResult> GetBatchesForFarm([FromQuery] PrintBatchState? statusFilter, [FromQuery] bool includeCompleted = false)
     {

@@ -21,6 +21,13 @@ public record PrintJobRequest(
     string? CustomName
 );
 
+public record ReportNoPrintsRequest(
+    [Required] Guid GroupId,
+    [Required] DateTime LessonDate,
+    [Required] string Reason,
+    string? AdditionalNotes
+);
+
 
 // ==========================================
 // 2. KONTRAKTY WYJŚCIOWE (WIDOK DLA DRUKARZA)
