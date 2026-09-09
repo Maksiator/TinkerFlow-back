@@ -293,9 +293,9 @@ public class PrintBatchesController : ControllerBase
             query = query.Where(pb => pb.Status != PrintBatchState.Completed);
         }
 
-        // Zgłoszenia "brak wydruków / inna technologia" wygasają automatycznie po 7 dniach (tygodniowy cykl zajęć)
-        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
-        query = query.Where(pb => pb.Status != PrintBatchState.NoPrints || pb.CreatedAt >= sevenDaysAgo);
+        // Zgłoszenia "brak wydruków / inna technologia" wygasają automatycznie 7 dni po dacie zajęć (pb.LessonDate)
+        var expirationThreshold = DateTime.UtcNow.Date.AddDays(-7);
+        query = query.Where(pb => pb.Status != PrintBatchState.NoPrints || pb.LessonDate >= expirationThreshold);
 
         if (statusFilter.HasValue)
         {
