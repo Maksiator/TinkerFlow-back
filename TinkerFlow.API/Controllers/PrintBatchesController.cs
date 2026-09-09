@@ -182,9 +182,10 @@ public class PrintBatchesController : ControllerBase
 
         var lessonDateUtc = DateTime.SpecifyKind(request.LessonDate.Date, DateTimeKind.Utc);
 
+        var reasonText = !string.IsNullOrWhiteSpace(request.Reason) ? request.Reason.Trim() : "Inna technologia (brak wydruków)";
         var noteContent = !string.IsNullOrWhiteSpace(request.AdditionalNotes)
-            ? $"{request.Reason}: {request.AdditionalNotes.Trim()}"
-            : request.Reason;
+            ? $"{reasonText}: {request.AdditionalNotes.Trim()}"
+            : reasonText;
 
         // Sprawdzamy czy dla tej grupy w tym dniu już nie zgłoszono braku wydruków
         var existingNoPrints = await _context.PrintBatches
@@ -291,6 +292,10 @@ public class PrintBatchesController : ControllerBase
         {
             query = query.Where(pb => pb.Status != PrintBatchState.Completed);
         }
+
+        // Zgłoszenia "brak wydruków / inna technologia" wygasają automatycznie po 7 dniach (tygodniowy cykl zajęć)
+        var sevenDaysAgo = DateTime.UtcNow.AddDays(-7);
+        query = query.Where(pb => pb.Status != PrintBatchState.NoPrints || pb.CreatedAt >= sevenDaysAgo);
 
         if (statusFilter.HasValue)
         {

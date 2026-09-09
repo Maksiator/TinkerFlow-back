@@ -24,7 +24,7 @@ public record PrintJobRequest(
 public record ReportNoPrintsRequest(
     [Required] Guid GroupId,
     [Required] DateTime LessonDate,
-    [Required] string Reason,
+    string? Reason,
     string? AdditionalNotes
 );
 
