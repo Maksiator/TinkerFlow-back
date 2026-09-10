@@ -28,53 +28,107 @@ public class UsersController : ControllerBase
     }
 
     [HttpGet]
-[Authorize(Roles = "Admin,Coordinator")]
-public async Task<IActionResult> GetUsers(
-    [FromQuery] string? search,
-    [FromQuery] int page = 1,
-    [FromQuery] int pageSize = 15)
-{
-    var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-    if (currentUserIdStr == null) return Unauthorized();
-
-    var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
-    if (currentUser == null) return Unauthorized();
-
-    var usersQuery = _userManager.Users
-        .AsNoTracking()
-        .Include(u => u.UserBranches)
-        .ThenInclude(ub => ub.Branch)
-        .AsQueryable();
-
-    if (currentUser.Role == UserRole.Coordinator)
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] string? search,
+        [FromQuery] UserRole? role = null,
+        [FromQuery] Guid? branchId = null,
+        [FromQuery] string sortBy = "branch",
+        [FromQuery] string sortOrder = "asc",
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 15)
     {
-        var coordinatorBranchIds = await _context.UserBranches
-            .Where(ub => ub.UserId == currentUser.Id)
-            .Select(ub => ub.BranchId)
-            .ToListAsync();
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
 
-        if (!coordinatorBranchIds.Any())
+        var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (currentUser == null) return Unauthorized();
+
+        var usersQuery = _userManager.Users
+            .AsNoTracking()
+            .Include(u => u.UserBranches)
+            .ThenInclude(ub => ub.Branch)
+            .AsQueryable();
+
+        if (currentUser.Role == UserRole.Coordinator)
         {
-            return Ok(new PagedResult<UserResponse>(new List<UserResponse>(), 0, 0, page, pageSize));
+            var coordinatorBranchIds = await _context.UserBranches
+                .Where(ub => ub.UserId == currentUser.Id)
+                .Select(ub => ub.BranchId)
+                .ToListAsync();
+
+            if (!coordinatorBranchIds.Any())
+            {
+                return Ok(new PagedResult<UserResponse>(new List<UserResponse>(), 0, 0, page, pageSize));
+            }
+
+            usersQuery = usersQuery.Where(u => 
+                u.Id == currentUser.Id || 
+                u.UserBranches.Any(ub => coordinatorBranchIds.Contains(ub.BranchId))
+            );
         }
 
-        usersQuery = usersQuery.Where(u => 
-            u.Id == currentUser.Id || 
-            u.UserBranches.Any(ub => coordinatorBranchIds.Contains(ub.BranchId))
-        );
-    }
+        // Filtrowanie po roli
+        if (role.HasValue)
+        {
+            usersQuery = usersQuery.Where(u => u.Role == role.Value);
+        }
 
-    if (!string.IsNullOrWhiteSpace(search))
-    {
-        var lowerSearch = search.ToLower();
-        usersQuery = usersQuery.Where(u => 
-            u.FirstName.ToLower().Contains(lowerSearch) || 
-            u.LastName.ToLower().Contains(lowerSearch) ||
-            (u.FirstName + " " + u.LastName).ToLower().Contains(lowerSearch) ||
-            u.Email!.ToLower().Contains(lowerSearch));
-    }
+        // Filtrowanie po oddziale
+        if (branchId.HasValue)
+        {
+            usersQuery = usersQuery.Where(u => u.UserBranches.Any(ub => ub.BranchId == branchId.Value));
+        }
 
-    usersQuery = usersQuery.OrderBy(u => u.LastName).ThenBy(u => u.FirstName);
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            var lowerSearch = search.ToLower();
+            usersQuery = usersQuery.Where(u => 
+                u.FirstName.ToLower().Contains(lowerSearch) || 
+                u.LastName.ToLower().Contains(lowerSearch) ||
+                (u.FirstName + " " + lowerSearch).ToLower().Contains(lowerSearch) ||
+                u.Email!.ToLower().Contains(lowerSearch));
+        }
+
+        // Sortowanie (domyślnie po oddziale)
+        var isDesc = string.Equals(sortOrder, "desc", StringComparison.OrdinalIgnoreCase);
+        switch (sortBy?.ToLower())
+        {
+            case "branch":
+                usersQuery = isDesc
+                    ? usersQuery.OrderByDescending(u => u.UserBranches.OrderBy(ub => ub.Branch.Name).Select(ub => ub.Branch.Name).FirstOrDefault())
+                                .ThenBy(u => u.LastName).ThenBy(u => u.FirstName)
+                    : usersQuery.OrderBy(u => u.UserBranches.OrderBy(ub => ub.Branch.Name).Select(ub => ub.Branch.Name).FirstOrDefault())
+                                .ThenBy(u => u.LastName).ThenBy(u => u.FirstName);
+                break;
+
+            case "name":
+            case "lastname":
+                usersQuery = isDesc
+                    ? usersQuery.OrderByDescending(u => u.LastName).ThenByDescending(u => u.FirstName)
+                    : usersQuery.OrderBy(u => u.LastName).ThenBy(u => u.FirstName);
+                break;
+
+            case "role":
+                usersQuery = isDesc
+                    ? usersQuery.OrderByDescending(u => u.Role).ThenBy(u => u.LastName)
+                    : usersQuery.OrderBy(u => u.Role).ThenBy(u => u.LastName);
+                break;
+
+            case "status":
+                usersQuery = isDesc
+                    ? usersQuery.OrderByDescending(u => u.IsActive).ThenBy(u => u.LastName)
+                    : usersQuery.OrderBy(u => u.IsActive).ThenBy(u => u.LastName);
+                break;
+
+            default:
+                usersQuery = isDesc
+                    ? usersQuery.OrderByDescending(u => u.UserBranches.OrderBy(ub => ub.Branch.Name).Select(ub => ub.Branch.Name).FirstOrDefault())
+                                .ThenBy(u => u.LastName).ThenBy(u => u.FirstName)
+                    : usersQuery.OrderBy(u => u.UserBranches.OrderBy(ub => ub.Branch.Name).Select(ub => ub.Branch.Name).FirstOrDefault())
+                                .ThenBy(u => u.LastName).ThenBy(u => u.FirstName);
+                break;
+        }
 
     var totalCount = await usersQuery.CountAsync();
     var totalPages = (int)Math.Ceiling(totalCount / (double)pageSize);
