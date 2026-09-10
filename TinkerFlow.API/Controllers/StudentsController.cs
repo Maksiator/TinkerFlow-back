@@ -495,6 +495,107 @@ public class StudentsController : ControllerBase
         await _context.SaveChangesAsync();
         return NoContent();
     }
+
+    // 7b. PRZEPISZ UCZNIA DO INNEJ GRUPY (MIGRACJA 1-KLIKIEM)
+    [HttpPost("{id}/transfer")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> TransferStudent(Guid id, [FromBody] TransferStudentRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+        var currentUser = await _userManager.FindByIdAsync(currentUserIdStr);
+        if (currentUser == null) return Unauthorized();
+
+        var student = await _context.Students
+            .Include(s => s.Group)
+            .FirstOrDefaultAsync(s => s.Id == id);
+            
+        if (student == null) return NotFound(new { message = "Nie odnaleziono ucznia." });
+
+        if (student.GroupId.HasValue && student.GroupId.Value == request.TargetGroupId)
+        {
+            return BadRequest(new { message = "Uczeń jest już przypisany do tej grupy." });
+        }
+
+        var targetGroup = await _context.Groups
+            .Include(g => g.Branch)
+            .FirstOrDefaultAsync(g => g.Id == request.TargetGroupId);
+
+        if (targetGroup == null)
+        {
+            return BadRequest(new { message = "Grupa docelowa nie istnieje." });
+        }
+
+        if (targetGroup.IsArchived)
+        {
+            return BadRequest(new { message = "Nie można przepisać ucznia do zarchiwizowanej grupy." });
+        }
+
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            var branchIds = await GetCoordinatorBranchIdsAsync(currentUser.Id);
+
+            // Weryfikacja dostępu do bieżącej grupy/oddziału ucznia
+            if (student.GroupId.HasValue)
+            {
+                if (!await _accessService.CanAccessGroupAsync(currentUser.Id, student.GroupId.Value))
+                    return Forbid();
+            }
+            else if (student.BranchId.HasValue)
+            {
+                if (!branchIds.Contains(student.BranchId.Value)) return Forbid();
+            }
+
+            // Weryfikacja dostępu do grupy docelowej
+            if (!await _accessService.CanAccessGroupAsync(currentUser.Id, targetGroup.Id))
+            {
+                return Forbid();
+            }
+        }
+
+        var sourceGroupName = student.Group?.Name ?? "Brak grupy";
+        var currentYear = DateTime.UtcNow.Month >= 9 
+            ? $"{DateTime.UtcNow.Year}/{DateTime.UtcNow.Year + 1}" 
+            : $"{DateTime.UtcNow.Year - 1}/{DateTime.UtcNow.Year}";
+
+        var transferNote = !string.IsNullOrWhiteSpace(request.Reason)
+            ? $"{currentYear} (Przepisano do: {targetGroup.Name} - {request.Reason.Trim()})"
+            : $"{currentYear} (Przepisano do: {targetGroup.Name})";
+
+        if (request.RecordHistory && student.GroupId.HasValue)
+        {
+            _context.StudentGroupHistories.Add(new StudentGroupHistory
+            {
+                Id = Guid.NewGuid(),
+                StudentId = student.Id,
+                GroupId = student.GroupId.Value,
+                AcademicYear = transferNote,
+                ArchivedAt = DateTime.UtcNow,
+                IsMidYear = true
+            });
+        }
+
+        student.GroupId = targetGroup.Id;
+        student.BranchId = targetGroup.BranchId;
+
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "Students",
+            "TransferStudent",
+            $"Przepisano ucznia {student.FirstName} {student.LastName} z grupy '{sourceGroupName}' do '{targetGroup.Name}'",
+            entityId: student.Id,
+            entityName: $"{student.FirstName} {student.LastName}",
+            ipAddress: HttpContext.GetClientIpAddress());
+
+        return Ok(new
+        {
+            message = $"Uczeń został pomyślnie przepisany do grupy {targetGroup.Name}.",
+            studentId = student.Id,
+            targetGroupId = targetGroup.Id,
+            targetGroupName = targetGroup.Name
+        });
+    }
     
     // 8. USUŃ
     [HttpDelete("{id}")]

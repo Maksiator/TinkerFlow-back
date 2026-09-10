@@ -58,3 +58,9 @@ public record BulkChangeGroupRequest(
     bool IsMidYear = false,
     string? AcademicYear = null
 );
+
+public record TransferStudentRequest(
+    Guid TargetGroupId,
+    string? Reason = null,
+    bool RecordHistory = true
+);
