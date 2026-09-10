@@ -122,9 +122,24 @@ public async Task<IActionResult> GetUsers(
                 .Select(ub => ub.BranchId)
                 .ToListAsync();
 
+            // Bezpiecznik: jeśli koordynator tworzy trenera i nie przesłano oddziałów, przypisz automatycznie oddziały koordynatora
+            if (request.BranchIds == null || !request.BranchIds.Any())
+            {
+                request = request with { BranchIds = coordinatorBranchIds };
+            }
+
             if (request.BranchIds.Any(id => !coordinatorBranchIds.Contains(id)))
             {
                 return Forbid();
+            }
+        }
+
+        // Walidacja: Trener i Koordynator muszą mieć co najmniej jeden oddział
+        if (request.Role == UserRole.Trainer || request.Role == UserRole.Coordinator)
+        {
+            if (request.BranchIds == null || !request.BranchIds.Any())
+            {
+                return BadRequest(new { message = "Pracownik o roli Trener lub Koordynator musi mieć przypisany co najmniej jeden oddział." });
             }
         }
 
@@ -224,6 +239,15 @@ public async Task<IActionResult> GetUsers(
             if (request.BranchIds.Any(id => !coordinatorBranchIds.Contains(id)))
             {
                 return Forbid();
+            }
+        }
+
+        // Walidacja: Trener i Koordynator muszą mieć co najmniej jeden oddział
+        if (request.Role == UserRole.Trainer || request.Role == UserRole.Coordinator)
+        {
+            if (request.BranchIds == null || !request.BranchIds.Any())
+            {
+                return BadRequest(new { message = "Pracownik o roli Trener lub Koordynator musi mieć przypisany co najmniej jeden oddział." });
             }
         }
 
