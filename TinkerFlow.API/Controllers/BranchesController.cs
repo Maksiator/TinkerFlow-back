@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TinkerFlow.API.DTOs;
 using TinkerFlow.Domain.Entities;
+using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure;
 
 namespace TinkerFlow.API.Controllers;
@@ -38,7 +39,8 @@ public class BranchesController : ControllerBase
             .Select(b => new BranchResponse(
                 b.Id,
                 b.Name,
-                b.Groups.Count() // Od razu liczymy, ile grup ma oddział
+                b.Groups.Count(), // Od razu liczymy, ile grup ma oddział
+                b.UserBranches.Count(ub => ub.User.Role == UserRole.Trainer) // Liczba trenerów przypisanych do oddziału
             ))
             .ToListAsync();
 
@@ -63,7 +65,8 @@ public class BranchesController : ControllerBase
             .Select(b => new BranchResponse(
                 b.Id,
                 b.Name,
-                b.Groups.Count()
+                b.Groups.Count(),
+                b.UserBranches.Count(ub => ub.User.Role == UserRole.Trainer)
             ))
             .FirstOrDefaultAsync();
 
@@ -86,8 +89,8 @@ public class BranchesController : ControllerBase
         _context.Branches.Add(branch);
         await _context.SaveChangesAsync();
 
-        // Zwracamy stworzony obiekt, GroupCount na starcie to oczywiście 0
-        return CreatedAtAction(nameof(GetBranch), new { id = branch.Id }, new BranchResponse(branch.Id, branch.Name, 0));
+        // Zwracamy stworzony obiekt, GroupCount i TrainersCount na starcie to oczywiście 0
+        return CreatedAtAction(nameof(GetBranch), new { id = branch.Id }, new BranchResponse(branch.Id, branch.Name, 0, 0));
     }
 
     [HttpPut("{id}")]

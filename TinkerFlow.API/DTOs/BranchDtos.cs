@@ -11,5 +11,6 @@ public record UpdateBranchRequest(
 public record BranchResponse(
     Guid Id,
     string Name,
-    int GroupCount // Fajny bonus dla Admina, żeby widział wielkość oddziału
+    int GroupCount, // Liczba grup w oddziale
+    int TrainersCount = 0 // Liczba trenerów przypisanych do oddziału
 );
