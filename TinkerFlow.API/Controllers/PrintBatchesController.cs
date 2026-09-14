@@ -397,7 +397,6 @@ public class PrintBatchesController : ControllerBase
         }
     }
 
-    [HttpPatch("~/api/printjobs/{jobId:guid}/status")]
     [HttpPatch("/api/printjobs/{jobId:guid}/status")]
     [HttpPatch("jobs/{jobId:guid}/status")]
     public async Task<IActionResult> UpdateJobStatus(Guid jobId, [FromBody] UpdatePrintJobStatusRequest request)
@@ -405,51 +404,66 @@ public class PrintBatchesController : ControllerBase
         if (!ModelState.IsValid)
             return BadRequest(ModelState);
 
-        var job = await _context.PrintJobs
-            .Include(pj => pj.PrintBatch)
-                .ThenInclude(pb => pb.PrintJobs)
-            .FirstOrDefaultAsync(pj => pj.Id == jobId);
-
-        if (job == null)
-            return NotFound(new { message = "Nie znaleziono podanego wydruku." });
-
-        job.Status = request.Status;
-
-        var batch = job.PrintBatch;
-        if (batch != null && batch.Status != PrintBatchState.Completed && batch.Status != PrintBatchState.NoPrints)
+        try
         {
-            var allJobs = batch.PrintJobs.ToList();
+            var job = await _context.PrintJobs
+                .Include(pj => pj.PrintBatch)
+                    .ThenInclude(pb => pb.PrintJobs)
+                .FirstOrDefaultAsync(pj => pj.Id == jobId);
 
-            // 1. Jeśli wszystkie modele w paczce zostały wydrukowane (lub zepsute, ale co najmniej 1 wydrukowany i zero w toku/oczekujących)
-            if (allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed)
-                && allJobs.Any(j => j.Status == PrintJobsStates.Printed))
+            if (job == null)
+                return NotFound(new { message = "Nie znaleziono podanego wydruku." });
+
+            job.Status = request.Status;
+
+            var batch = job.PrintBatch;
+            if (batch != null && batch.Status != PrintBatchState.Completed && batch.Status != PrintBatchState.NoPrints)
             {
-                batch.Status = PrintBatchState.ReadyForCollection;
+                var allJobs = batch.PrintJobs?.ToList() ?? new List<PrintJob>();
+
+                // 1. Jeśli wszystkie modele w paczce zostały wydrukowane (lub zepsute, ale co najmniej 1 wydrukowany i zero w toku/oczekujących)
+                if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed)
+                    && allJobs.Any(j => j.Status == PrintJobsStates.Printed))
+                {
+                    batch.Status = PrintBatchState.ReadyForCollection;
+                }
+                // 2. Jeśli jakikolwiek model jest w druku lub został wydrukowany (a nie wszystkie są gotowe)
+                else if (allJobs.Any(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Printed))
+                {
+                    batch.Status = PrintBatchState.Printing;
+                }
+                // 3. Jeśli wszystkie modele są oczekujące (cofnięte)
+                else if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Pending))
+                {
+                    batch.Status = PrintBatchState.Pending;
+                }
             }
-            // 2. Jeśli jakikolwiek model jest w druku lub został wydrukowany (a nie wszystkie są gotowe)
-            else if (allJobs.Any(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Printed))
+
+            await _context.SaveChangesAsync();
+
+            _logger.LogInformation("Zmieniono status wydruku {JobId} na {Status}. Status paczki {BatchId}: {BatchStatus}",
+                jobId, request.Status, batch?.Id, batch?.Status);
+
+            await _auditLogService.LogAsync(
+                "PrintJobs",
+                "UpdateJobStatus",
+                $"Zmieniono status wydruku na: {request.Status}",
+                entityId: job.Id,
+                ipAddress: HttpContext.GetClientIpAddress());
+
+            return Ok(new
             {
-                batch.Status = PrintBatchState.Printing;
-            }
-            // 3. Jeśli wszystkie modele są oczekujące (cofnięte)
-            else if (allJobs.All(j => j.Status == PrintJobsStates.Pending))
-            {
-                batch.Status = PrintBatchState.Pending;
-            }
+                message = "Status wydruku zaktualizowany.",
+                newStatus = job.Status,
+                batchStatus = batch?.Status,
+                batchId = batch?.Id
+            });
         }
-
-        await _context.SaveChangesAsync();
-
-        _logger.LogInformation("Zmieniono status wydruku {JobId} na {Status}. Status paczki {BatchId}: {BatchStatus}",
-            jobId, request.Status, batch?.Id, batch?.Status);
-
-        return Ok(new
+        catch (Exception ex)
         {
-            message = "Status wydruku zaktualizowany.",
-            newStatus = job.Status,
-            batchStatus = batch?.Status,
-            batchId = batch?.Id
-        });
+            _logger.LogError(ex, "Błąd podczas zmiany statusu wydruku {JobId}", jobId);
+            return StatusCode(500, new { message = "Wystąpił błąd podczas aktualizacji statusu wydruku." });
+        }
     }
 
     [HttpPut("{batchId:guid}")]
