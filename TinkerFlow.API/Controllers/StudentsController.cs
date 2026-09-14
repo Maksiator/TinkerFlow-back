@@ -906,6 +906,7 @@ public class StudentsController : ControllerBase
             .ToListAsync();
 
         var newStudents = new List<Student>();
+        var skippedStudents = new List<string>();
 
         foreach (var req in requests)
         {
@@ -937,19 +938,33 @@ public class StudentsController : ControllerBase
                 resolvedBranchId = await _context.Branches.Select(b => b.Id).FirstOrDefaultAsync();
             }
 
-            var exists = existingStudents.Any(s => 
-                s.FirstName.ToLower() == req.FirstName.Trim().ToLower() && 
-                s.LastName.ToLower() == req.LastName.Trim().ToLower() &&
+            var reqFirst = req.FirstName.Trim();
+            var reqLast = req.LastName.Trim();
+
+            // 1. Sprawdzamy czy istnieje już w bazie danych
+            var existsInDb = existingStudents.Any(s => 
+                s.FirstName.ToLower() == reqFirst.ToLower() && 
+                s.LastName.ToLower() == reqLast.ToLower() &&
                 s.GroupId == req.GroupId &&
                 (s.GroupId != null || s.BranchId == resolvedBranchId));
 
-            if (!exists)
+            // 2. Sprawdzamy czy nie jest duplikatem wewnątrz bieżącej wklejonej paczki
+            var existsInCurrentBatch = newStudents.Any(s =>
+                s.FirstName.ToLower() == reqFirst.ToLower() &&
+                s.LastName.ToLower() == reqLast.ToLower() &&
+                s.GroupId == req.GroupId);
+
+            if (existsInDb || existsInCurrentBatch)
+            {
+                skippedStudents.Add($"{reqFirst} {reqLast}");
+            }
+            else
             {
                 newStudents.Add(new Student
                 {
                     Id = Guid.NewGuid(),
-                    FirstName = req.FirstName.Trim(),
-                    LastName = req.LastName.Trim(),
+                    FirstName = reqFirst,
+                    LastName = reqLast,
                     DateOfBirth = req.DateOfBirth,
                     Level = req.Level, 
                     IsIndependent = req.IsIndependent,
@@ -968,10 +983,17 @@ public class StudentsController : ControllerBase
             await _auditLogService.LogAsync(
                 "Students",
                 "ImportStudents",
-                $"Zaimportowano / dodano masowo {newStudents.Count} uczniów",
+                $"Zaimportowano / dodano masowo {newStudents.Count} uczniów (pominięto {skippedStudents.Count} duplikatów)",
                 ipAddress: HttpContext.GetClientIpAddress());
         }
 
-        return Ok(new { message = $"Pomyślnie zaimportowano {newStudents.Count} nowych uczniów. (Pominięto duplikaty, jeśli były)." });
+        return Ok(new
+        {
+            message = $"Pomyślnie zaimportowano {newStudents.Count} nowych uczniów. Pominięto {skippedStudents.Count} duplikatów.",
+            addedCount = newStudents.Count,
+            skippedCount = skippedStudents.Count,
+            addedStudents = newStudents.Select(s => $"{s.FirstName} {s.LastName}").ToList(),
+            skippedStudents = skippedStudents
+        });
     }
 }
