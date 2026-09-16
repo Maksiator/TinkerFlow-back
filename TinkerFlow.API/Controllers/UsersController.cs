@@ -149,7 +149,8 @@ public class UsersController : ControllerBase
             ub.BranchId,
             ub.Branch.Name
         )).ToList(),
-        u.MustChangePassword
+        u.MustChangePassword,
+        u.CanActAsTrainer
     )).ToList();
 
     return Ok(new PagedResult<UserResponse>(result, totalCount, totalPages, page, pageSize));
@@ -208,6 +209,11 @@ public class UsersController : ControllerBase
             MustChangePassword = true
         };
 
+        if (user.Role == UserRole.Admin && request.CanActAsTrainer.HasValue)
+        {
+            user.CanActAsTrainer = request.CanActAsTrainer.Value;
+        }
+
         var result = await _userManager.CreateAsync(user, request.Password);
 
         if (!result.Succeeded)
@@ -244,7 +250,7 @@ public class UsersController : ControllerBase
             userRole: currentUser.Role.ToString(),
             ipAddress: HttpContext.GetClientIpAddress());
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword, user.CanActAsTrainer));
     }
 
     [HttpPut("{id}")]
@@ -309,6 +315,11 @@ public class UsersController : ControllerBase
         user.LastName = request.LastName;
         user.Role = request.Role;
 
+        if (user.Role == UserRole.Admin && request.CanActAsTrainer.HasValue)
+        {
+            user.CanActAsTrainer = request.CanActAsTrainer.Value;
+        }
+
         var result = await _userManager.UpdateAsync(user);
 
         if (!result.Succeeded)
@@ -350,7 +361,7 @@ public class UsersController : ControllerBase
             userRole: currentUser.Role.ToString(),
             ipAddress: HttpContext.GetClientIpAddress());
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword, user.CanActAsTrainer));
     }
     
     [HttpPut("{id}/status")]
@@ -525,7 +536,73 @@ public class UsersController : ControllerBase
                 ub.BranchId,
                 ub.Branch.Name
             )).ToList(),
-            user.MustChangePassword
+            user.MustChangePassword,
+            user.CanActAsTrainer
+        );
+
+        return Ok(response);
+    }
+
+    [HttpPut("me")]
+    [Authorize]
+    public async Task<IActionResult> UpdateCurrentUserProfile([FromBody] UpdateProfileRequest request)
+    {
+        var currentUserIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (currentUserIdStr == null) return Unauthorized();
+
+        var user = await _userManager.Users
+            .Include(u => u.UserBranches)
+            .ThenInclude(ub => ub.Branch)
+            .FirstOrDefaultAsync(u => u.Id.ToString() == currentUserIdStr);
+
+        if (user == null) return Unauthorized();
+
+        if (string.IsNullOrWhiteSpace(request.FirstName) || string.IsNullOrWhiteSpace(request.LastName))
+        {
+            return BadRequest(new { message = "Imię i nazwisko nie mogą być puste." });
+        }
+
+        user.FirstName = request.FirstName.Trim();
+        user.LastName = request.LastName.Trim();
+
+        // Tylko Administrator może decydować o byciu wybieranym jako trener
+        if (user.Role == UserRole.Admin && request.CanActAsTrainer.HasValue)
+        {
+            user.CanActAsTrainer = request.CanActAsTrainer.Value;
+        }
+
+        var result = await _userManager.UpdateAsync(user);
+        if (!result.Succeeded)
+        {
+            var errors = result.Errors.Select(e => e.Description).ToList();
+            return BadRequest(new { message = string.Join(" ", errors) });
+        }
+
+        await _auditLogService.LogAsync(
+            "Users",
+            "UpdateProfile",
+            $"Zaktualizowano profil własny: {user.FirstName} {user.LastName} (Możliwość wyboru jako trener: {user.CanActAsTrainer})",
+            entityId: user.Id,
+            entityName: $"{user.FirstName} {user.LastName}",
+            userId: user.Id,
+            userEmail: user.Email,
+            userName: $"{user.FirstName} {user.LastName}",
+            userRole: user.Role.ToString(),
+            ipAddress: HttpContext.GetClientIpAddress());
+
+        var response = new UserResponse(
+            user.Id,
+            user.FirstName,
+            user.LastName,
+            user.Email ?? string.Empty,
+            user.Role,
+            user.IsActive,
+            user.UserBranches.Select(ub => new UserBranchDto(
+                ub.BranchId,
+                ub.Branch.Name
+            )).ToList(),
+            user.MustChangePassword,
+            user.CanActAsTrainer
         );
 
         return Ok(response);
