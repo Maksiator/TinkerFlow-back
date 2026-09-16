@@ -79,24 +79,26 @@ public class AuditLogsController : ControllerBase
         var totalCount = await query.CountAsync();
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-        var items = await query
+        var items = await (from l in query
+                           join u in _context.Users on l.UserId equals u.Id into userGroup
+                           from u in userGroup.DefaultIfEmpty()
+                           select new AuditLogResponse(
+                               l.Id,
+                               l.Timestamp,
+                               l.UserId,
+                               l.UserEmail ?? (u != null ? u.Email : null),
+                               l.UserName ?? (u != null ? (u.FirstName + " " + u.LastName).Trim() : null),
+                               l.UserRole ?? (u != null ? u.Role.ToString() : null),
+                               l.Action,
+                               l.Category,
+                               l.EntityId,
+                               l.EntityName,
+                               l.Details,
+                               l.IpAddress
+                           ))
             .OrderByDescending(l => l.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(l => new AuditLogResponse(
-                l.Id,
-                l.Timestamp,
-                l.UserId,
-                l.UserEmail,
-                l.UserName,
-                l.UserRole,
-                l.Action,
-                l.Category,
-                l.EntityId,
-                l.EntityName,
-                l.Details,
-                l.IpAddress
-            ))
             .ToListAsync();
 
         return Ok(new AuditLogListResponse(items, totalCount, page, pageSize, totalPages));

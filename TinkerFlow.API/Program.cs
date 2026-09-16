@@ -55,6 +55,7 @@ builder.Services.AddDbContext<TinkerFlowDbContext>(options =>
     // options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<IGroupAccessService, GroupAccessService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
@@ -226,6 +227,68 @@ using (var scope = app.Services.CreateScope())
 
         // Tworzymy konto z silnym hasłem (Identity samo je zahashuje)
         await userManager.CreateAsync(adminUser, "Admin123!");
+    }
+
+    // --- UZUPEŁNIENIE DANYCH WYKONAWCY W LOGACH AUDYTU ---
+    try
+    {
+        // 1. Uzupełnienie logów z UserId, którym brakowało imienia/nazwiska lub emaila
+        var logsToFix = await context.AuditLogs
+            .Where(l => l.UserId != null && (l.UserName == null || l.UserEmail == null))
+            .ToListAsync();
+
+        if (logsToFix.Any())
+        {
+            var userIds = logsToFix.Select(l => l.UserId!.Value).Distinct().ToList();
+            var usersMap = await context.Users
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id);
+
+            foreach (var log in logsToFix)
+            {
+                if (usersMap.TryGetValue(log.UserId!.Value, out var u))
+                {
+                    log.UserName ??= $"{u.FirstName} {u.LastName}".Trim();
+                    log.UserEmail ??= u.Email;
+                    log.UserRole ??= u.Role.ToString();
+                }
+            }
+            await context.SaveChangesAsync();
+        }
+
+        // 2. Uzupełnienie logów bez UserId (np. dodawanie uczniów), które pochodzą z tego samego IP co logi z przypisanym użytkownikiem
+        var logsWithoutUser = await context.AuditLogs
+            .Where(l => l.UserId == null && l.IpAddress != null)
+            .ToListAsync();
+
+        if (logsWithoutUser.Any())
+        {
+            var knownLogsWithUser = await context.AuditLogs
+                .Where(l => l.UserId != null && l.IpAddress != null)
+                .OrderByDescending(l => l.Timestamp)
+                .ToListAsync();
+
+            foreach (var orphanLog in logsWithoutUser)
+            {
+                var matchingLog = knownLogsWithUser
+                    .FirstOrDefault(k => k.IpAddress == orphanLog.IpAddress &&
+                                         Math.Abs((k.Timestamp - orphanLog.Timestamp).TotalMinutes) <= 60);
+
+                if (matchingLog != null)
+                {
+                    orphanLog.UserId = matchingLog.UserId;
+                    orphanLog.UserName = matchingLog.UserName;
+                    orphanLog.UserEmail = matchingLog.UserEmail;
+                    orphanLog.UserRole = matchingLog.UserRole;
+                }
+            }
+            await context.SaveChangesAsync();
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Ostrzeżenie przy uzupełnianiu historycznych logów audytu.");
     }
 }
 
