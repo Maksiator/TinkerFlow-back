@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TinkerFlow.API.DTOs;
+using TinkerFlow.Domain.Entities;
 using TinkerFlow.Infrastructure;
 
 namespace TinkerFlow.API.Controllers;
@@ -79,27 +80,62 @@ public class AuditLogsController : ControllerBase
         var totalCount = await query.CountAsync();
         var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
 
-        var items = await (from l in query
-                           join u in _context.Users on l.UserId equals u.Id into userGroup
-                           from u in userGroup.DefaultIfEmpty()
-                           select new AuditLogResponse(
-                               l.Id,
-                               l.Timestamp,
-                               l.UserId,
-                               l.UserEmail ?? (u != null ? u.Email : null),
-                               l.UserName ?? (u != null ? (u.FirstName + " " + u.LastName).Trim() : null),
-                               l.UserRole ?? (u != null ? u.Role.ToString() : null),
-                               l.Action,
-                               l.Category,
-                               l.EntityId,
-                               l.EntityName,
-                               l.Details,
-                               l.IpAddress
-                           ))
+        var rawItems = await query
             .OrderByDescending(l => l.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(l => new
+            {
+                l.Id,
+                l.Timestamp,
+                l.UserId,
+                l.UserEmail,
+                l.UserName,
+                l.UserRole,
+                l.Action,
+                l.Category,
+                l.EntityId,
+                l.EntityName,
+                l.Details,
+                l.IpAddress
+            })
             .ToListAsync();
+
+        var userIdsToFetch = rawItems
+            .Where(l => l.UserId.HasValue && (string.IsNullOrEmpty(l.UserName) || string.IsNullOrEmpty(l.UserEmail)))
+            .Select(l => l.UserId!.Value)
+            .Distinct()
+            .ToList();
+
+        var usersMap = userIdsToFetch.Any()
+            ? await _context.Users
+                .AsNoTracking()
+                .Where(u => userIdsToFetch.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id)
+            : new Dictionary<Guid, User>();
+
+        var items = rawItems.Select(l =>
+        {
+            var user = l.UserId.HasValue && usersMap.TryGetValue(l.UserId.Value, out var u) ? u : null;
+            var email = !string.IsNullOrEmpty(l.UserEmail) ? l.UserEmail : user?.Email;
+            var name = !string.IsNullOrEmpty(l.UserName) ? l.UserName : (user != null ? $"{user.FirstName} {user.LastName}".Trim() : null);
+            var role = !string.IsNullOrEmpty(l.UserRole) ? l.UserRole : user?.Role.ToString();
+
+            return new AuditLogResponse(
+                l.Id,
+                l.Timestamp,
+                l.UserId,
+                email,
+                name,
+                role,
+                l.Action,
+                l.Category,
+                l.EntityId,
+                l.EntityName,
+                l.Details,
+                l.IpAddress
+            );
+        }).ToList();
 
         return Ok(new AuditLogListResponse(items, totalCount, page, pageSize, totalPages));
     }
