@@ -311,6 +311,38 @@ public class UsersController : ControllerBase
             }
         }
 
+        string? emailChangeNotice = null;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            var newEmail = request.Email.Trim();
+            if (!string.Equals(user.Email, newEmail, StringComparison.OrdinalIgnoreCase))
+            {
+                if (currentUser.Role != UserRole.Admin)
+                {
+                    return BadRequest(new { message = "Tylko Administrator może zmienić adres e-mail pracownika." });
+                }
+
+                var emailAttr = new System.ComponentModel.DataAnnotations.EmailAddressAttribute();
+                if (!emailAttr.IsValid(newEmail))
+                {
+                    return BadRequest(new { message = "Podano niepoprawny format adresu e-mail." });
+                }
+
+                var existingUserWithEmail = await _userManager.FindByEmailAsync(newEmail);
+                if (existingUserWithEmail != null && existingUserWithEmail.Id != user.Id)
+                {
+                    return BadRequest(new { message = "Użytkownik o podanym adresie e-mail już istnieje w systemie." });
+                }
+
+                var oldEmail = user.Email;
+                user.Email = newEmail;
+                user.NormalizedEmail = newEmail.ToUpperInvariant();
+                user.UserName = newEmail;
+                user.NormalizedUserName = newEmail.ToUpperInvariant();
+                emailChangeNotice = $" (zmieniono e-mail z '{oldEmail}' na '{newEmail}')";
+            }
+        }
+
         user.FirstName = request.FirstName;
         user.LastName = request.LastName;
         user.Role = request.Role;
@@ -352,7 +384,7 @@ public class UsersController : ControllerBase
         await _auditLogService.LogAsync(
             "Users",
             "UpdateUser",
-            $"Zaktualizowano dane pracownika {user.FirstName} {user.LastName} (rola: {user.Role})",
+            $"Zaktualizowano dane pracownika {user.FirstName} {user.LastName} (rola: {user.Role}){emailChangeNotice ?? ""}",
             entityId: user.Id,
             entityName: $"{user.FirstName} {user.LastName}",
             userId: currentUser.Id,

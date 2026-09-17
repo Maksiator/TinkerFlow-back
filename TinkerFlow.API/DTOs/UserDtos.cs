@@ -18,7 +18,8 @@ public record UpdateUserRequest(
     string LastName,
     TinkerFlow.Domain.Enums.UserRole Role,
     List<Guid> BranchIds, // NOWE: Lista oddziałów po aktualizacji
-    bool? CanActAsTrainer = null
+    bool? CanActAsTrainer = null,
+    string? Email = null
 );
 
 public record UpdateProfileRequest(
