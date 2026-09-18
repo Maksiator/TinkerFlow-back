@@ -146,7 +146,7 @@ public class PrintBatchesController : ControllerBase
                 ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new { 
-                message = "Paczka wysłana pomyślnie na farmę.", 
+                message = "Paczka wysłana pomyślnie do drukarza.", 
                 batchId = batch.Id, 
                 deadline = batch.Deadline 
             });
@@ -155,7 +155,7 @@ public class PrintBatchesController : ControllerBase
         {
             await transaction.RollbackAsync();
             _logger.LogError(ex, "Krytyczny błąd podczas tworzenia PrintBatch dla grupy {GroupId}.", request.GroupId);
-            return StatusCode(500, new { message = "Wystąpił błąd krytyczny serwera podczas wysyłania na farmę." });
+            return StatusCode(500, new { message = "Wystąpił błąd krytyczny serwera podczas wysyłania do drukarza." });
         }
     }
 
