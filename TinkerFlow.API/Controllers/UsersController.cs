@@ -57,14 +57,11 @@ public class UsersController : ControllerBase
                 .Select(ub => ub.BranchId)
                 .ToListAsync();
 
-            if (!coordinatorBranchIds.Any())
-            {
-                return Ok(new PagedResult<UserResponse>(new List<UserResponse>(), 0, 0, page, pageSize));
-            }
-
             usersQuery = usersQuery.Where(u => 
                 u.Id == currentUser.Id || 
-                u.UserBranches.Any(ub => coordinatorBranchIds.Contains(ub.BranchId))
+                u.Role == UserRole.Printer ||
+                (u.Role == UserRole.Admin && u.CanActAsTrainer) ||
+                (coordinatorBranchIds.Any() && u.UserBranches.Any(ub => coordinatorBranchIds.Contains(ub.BranchId)))
             );
         }
 
