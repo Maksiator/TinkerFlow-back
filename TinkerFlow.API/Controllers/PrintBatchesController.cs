@@ -698,6 +698,25 @@ public class PrintBatchesController : ControllerBase
                     }
                 }
             }
+
+            // Projekty z matrycy, które nie zostały wydrukowane (np. Failed / Błąd druku)
+            // cofamy ze stanu SentToPrint do InProgress, by trener na matrycy widział, że wymagają dokończenia/poprawy
+            var failedOrUnprintedProjectIds = batch.PrintJobs
+                .Where(j => j.StudentProjectId.HasValue && !request.ConfirmedStudentProjectIds.Contains(j.StudentProjectId.Value))
+                .Select(j => j.StudentProjectId!.Value)
+                .ToList();
+
+            if (failedOrUnprintedProjectIds.Any())
+            {
+                var unprintedStudentProjects = await _context.StudentProjects
+                    .Where(sp => failedOrUnprintedProjectIds.Contains(sp.Id))
+                    .ToListAsync();
+
+                foreach (var sp in unprintedStudentProjects)
+                {
+                    sp.Status = ProjectState.InProgress;
+                }
+            }
         
             batch.Status = PrintBatchState.Completed;
             
