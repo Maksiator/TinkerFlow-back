@@ -329,7 +329,8 @@ public class PrintBatchesController : ControllerBase
             pb.CreatedAt,
             pb.Group?.AssignedPrinterId,
             pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
-            pb.Group?.ClassDayOfWeek
+            pb.Group?.ClassDayOfWeek,
+            pb.PrinterNotes
         )).ToList();
 
         return Ok(response);
@@ -355,6 +356,10 @@ public class PrintBatchesController : ControllerBase
         {
             // Zmiana statusu samej paczki
             batch.Status = request.Status;
+            if (request.PrinterNotes != null)
+            {
+                batch.PrinterNotes = string.IsNullOrWhiteSpace(request.PrinterNotes) ? null : request.PrinterNotes.Trim();
+            }
 
             // 2. KASKADOWA ZMIANA STATUSÓW WYDRUKÓW (BULK UPDATE)
             if (request.Status == PrintBatchState.Printing)
@@ -387,7 +392,7 @@ public class PrintBatchesController : ControllerBase
                 entityId: batch.Id,
                 ipAddress: HttpContext.GetClientIpAddress());
 
-            return Ok(new { message = "Status paczki i wydruków zaktualizowany.", newStatus = batch.Status });
+            return Ok(new { message = "Status paczki i wydruków zaktualizowany.", newStatus = batch.Status, printerNotes = batch.PrinterNotes });
         }
         catch (Exception ex)
         {
@@ -395,6 +400,27 @@ public class PrintBatchesController : ControllerBase
             _logger.LogError(ex, "Błąd podczas zmiany statusu paczki {BatchId}", batchId);
             return StatusCode(500, new { message = "Wystąpił błąd podczas masowej aktualizacji." });
         }
+    }
+
+    [HttpPatch("{batchId:guid}/printer-notes")]
+    [Authorize(Roles = "Admin,Printer")]
+    public async Task<IActionResult> UpdatePrinterNotes(Guid batchId, [FromBody] UpdatePrinterNotesRequest request)
+    {
+        var batch = await _context.PrintBatches.FirstOrDefaultAsync(pb => pb.Id == batchId);
+        if (batch == null)
+            return NotFound(new { message = "Nie znaleziono podanej paczki." });
+
+        batch.PrinterNotes = string.IsNullOrWhiteSpace(request.PrinterNotes) ? null : request.PrinterNotes.Trim();
+        await _context.SaveChangesAsync();
+
+        await _auditLogService.LogAsync(
+            "PrintBatches",
+            "UpdatePrinterNotes",
+            $"Zaktualizowano notatkę drukarza dla paczki z dnia {batch.LessonDate:yyyy-MM-dd}",
+            entityId: batch.Id,
+            ipAddress: HttpContext.GetClientIpAddress());
+
+        return Ok(new { message = "Zapisano notatkę dla trenera.", printerNotes = batch.PrinterNotes });
     }
 
     [HttpPatch("/api/printjobs/{jobId:guid}/status")]
@@ -592,6 +618,8 @@ public class PrintBatchesController : ControllerBase
         var batch = await _context.PrintBatches
             .Include(pb => pb.Group)
                 .ThenInclude(g => g.Branch)
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.AssignedPrinter)
             .Include(pb => pb.PrintJobs)
                 .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -624,7 +652,11 @@ public class PrintBatchesController : ControllerBase
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
             )).ToList(),
-            batch.CreatedAt
+            batch.CreatedAt,
+            batch.Group?.AssignedPrinterId,
+            batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
+            batch.Group?.ClassDayOfWeek,
+            batch.PrinterNotes
         );
 
         return Ok(response);
@@ -751,6 +783,8 @@ public class PrintBatchesController : ControllerBase
         var batches = await _context.PrintBatches
             .Include(pb => pb.Group)
                 .ThenInclude(g => g.Branch)
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.AssignedPrinter)
             .Include(pb => pb.PrintJobs)
             .ThenInclude(pj => pj.Student)
             .Include(pb => pb.PrintJobs)
@@ -780,7 +814,11 @@ public class PrintBatchesController : ControllerBase
                     : (pj.CustomName ?? "Projekt własny"),
                 pj.Status
             )).ToList(),
-            pb.CreatedAt
+            pb.CreatedAt,
+            pb.Group?.AssignedPrinterId,
+            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
+            pb.Group?.ClassDayOfWeek,
+            pb.PrinterNotes
         )).ToList();
 
         return Ok(response);

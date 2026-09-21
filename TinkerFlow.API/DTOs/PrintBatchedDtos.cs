@@ -48,7 +48,8 @@ public record PrintBatchResponse(
     DateTime CreatedAt,
     Guid? AssignedPrinterId = null,
     string? AssignedPrinterName = null,
-    DayOfWeek? ClassDayOfWeek = null
+    DayOfWeek? ClassDayOfWeek = null,
+    string? PrinterNotes = null
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu
@@ -73,7 +74,12 @@ public record UpdatePrintBatchRequest(
 // ==========================================
 
 public record UpdatePrintBatchStatusRequest(
-    [Required] PrintBatchState Status
+    [Required] PrintBatchState Status,
+    string? PrinterNotes = null
+);
+
+public record UpdatePrinterNotesRequest(
+    string? PrinterNotes
 );
 
 public record UpdatePrintJobStatusRequest(

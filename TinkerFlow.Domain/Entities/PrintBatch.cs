@@ -18,6 +18,9 @@ public class PrintBatch
     // Zbiorcza notatka z textarea (np. "Wszystko białe, Janek x2 mniejsze")
     public string? Notes { get; set; } 
     
+    // Notatka / informacja od drukarza dla trenera
+    public string? PrinterNotes { get; set; }
+    
     public DateTime CreatedAt { get; set; }
     public Guid CreatedByTrainerId { get; set; }
 
