@@ -841,7 +841,7 @@ public class StudentsController : ControllerBase
                 StudentId = h.StudentId,
                 FirstName = h.Student != null ? h.Student.FirstName : "Uczeń usunięty",
                 LastName = h.Student != null ? h.Student.LastName : "",
-                DateOfBirth = h.Student != null ? h.Student.DateOfBirth.ToString("yyyy-MM-dd") : "",
+                DateOfBirth = h.Student != null && h.Student.DateOfBirth.HasValue ? h.Student.DateOfBirth.Value.ToString("yyyy-MM-dd") : "",
                 ArchivedAt = h.ArchivedAt,
                 AcademicYear = h.AcademicYear,
                 IsMidYear = h.IsMidYear

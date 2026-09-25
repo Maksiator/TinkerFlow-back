@@ -240,7 +240,7 @@ public class GroupsController : ControllerBase
             {
                 StudentId = s.Id,
                 FullName = s.FirstName + " " + s.LastName,
-                DateOfBirth = s.DateOfBirth.ToString("yyyy-MM-dd"),
+                DateOfBirth = s.DateOfBirth.HasValue ? s.DateOfBirth.Value.ToString("yyyy-MM-dd") : null,
                 Projects = allProjectsForStudents
                     .Where(sp => sp.StudentId == s.Id) // Filtruj w pamięci
                     .Select(sp => new
@@ -295,7 +295,7 @@ public class GroupsController : ControllerBase
             {
                 StudentId = s.Id,
                 FullName = s.FirstName + " " + s.LastName,
-                DateOfBirth = s.DateOfBirth.ToString("yyyy-MM-dd"),
+                DateOfBirth = s.DateOfBirth.HasValue ? s.DateOfBirth.Value.ToString("yyyy-MM-dd") : null,
                 Projects = allProjectsForStudents
                     .Where(sp => sp.StudentId == s.Id)
                     .Select(sp => new

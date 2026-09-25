@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using TinkerFlow.Infrastructure;
@@ -11,9 +12,11 @@ using TinkerFlow.Infrastructure;
 namespace TinkerFlow.Infrastructure.Migrations
 {
     [DbContext(typeof(TinkerFlowDbContext))]
-    partial class TinkerFlowDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260925115850_MakeStudentDateOfBirthNullable")]
+    partial class MakeStudentDateOfBirthNullable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

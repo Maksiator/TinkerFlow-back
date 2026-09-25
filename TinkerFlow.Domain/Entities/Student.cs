@@ -7,7 +7,7 @@ public class Student
     public Guid Id { get; set; }
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
-    public DateOnly DateOfBirth { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
     
     public SkillLevel Level { get; set; }
     public bool IsIndependent { get; set; }
