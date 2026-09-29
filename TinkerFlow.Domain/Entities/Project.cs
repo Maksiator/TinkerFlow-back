@@ -1,3 +1,5 @@
+using TinkerFlow.Domain.Enums;
+
 namespace TinkerFlow.Domain.Entities;
 
 public class Project
@@ -10,4 +12,7 @@ public class Project
     
     public bool IsPractice { get; set; }
     public bool IsYearBoundary { get; set; }
+
+    public ProjectSoftware Software { get; set; } = ProjectSoftware.Tinkercad;
+    public bool IsAdvanced { get; set; } = false;
 }

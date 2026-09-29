@@ -11,7 +11,9 @@ public record CreateProjectRequest(
     string Code,
     int SequenceOrder,
     bool IsPractice = false,
-    bool IsYearBoundary = false
+    bool IsYearBoundary = false,
+    ProjectSoftware Software = ProjectSoftware.Tinkercad,
+    bool IsAdvanced = false
 );
 
 public record UpdateProjectRequest(
@@ -19,7 +21,9 @@ public record UpdateProjectRequest(
     string Code,
     int SequenceOrder,
     bool IsPractice = false,
-    bool IsYearBoundary = false
+    bool IsYearBoundary = false,
+    ProjectSoftware Software = ProjectSoftware.Tinkercad,
+    bool IsAdvanced = false
 );
 
 public record ProjectResponse(
@@ -28,7 +32,9 @@ public record ProjectResponse(
     string Code,
     int SequenceOrder,
     bool IsPractice,
-    bool IsYearBoundary
+    bool IsYearBoundary,
+    ProjectSoftware Software = ProjectSoftware.Tinkercad,
+    bool IsAdvanced = false
 );
 
 // --- NOWE DTO SPECJALNIE DO "RENTGENA" ---

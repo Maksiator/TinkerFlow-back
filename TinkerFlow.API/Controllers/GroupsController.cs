@@ -68,7 +68,8 @@ public class GroupsController : ControllerBase
             BranchId = request.BranchId,
             PrimaryTrainerId = request.PrimaryTrainerId,
             AssignedPrinterId = request.AssignedPrinterId,
-            ClassDayOfWeek = request.ClassDayOfWeek
+            ClassDayOfWeek = request.ClassDayOfWeek,
+            Type = request.Type
         };
         
         _context.Groups.Add(newGroup);
@@ -77,7 +78,7 @@ public class GroupsController : ControllerBase
         await _auditLogService.LogAsync(
             "Groups",
             "CreateGroup",
-            $"Utworzono grupę '{newGroup.Name}'",
+            $"Utworzono grupę '{newGroup.Name}' (Typ: {newGroup.Type})",
             entityId: newGroup.Id,
             entityName: newGroup.Name,
             userId: currentUserId,
@@ -118,13 +119,14 @@ public class GroupsController : ControllerBase
         group.PrimaryTrainerId = request.PrimaryTrainerId;
         group.AssignedPrinterId = request.AssignedPrinterId;
         group.ClassDayOfWeek = request.ClassDayOfWeek;
+        group.Type = request.Type;
 
         await _context.SaveChangesAsync();
 
         await _auditLogService.LogAsync(
             "Groups",
             "UpdateGroup",
-            $"Zaktualizowano dane grupy '{group.Name}'",
+            $"Zaktualizowano dane grupy '{group.Name}' (Typ: {group.Type})",
             entityId: group.Id,
             entityName: group.Name,
             userId: currentUserId,
@@ -157,7 +159,8 @@ public class GroupsController : ControllerBase
                 g.IsArchived,
                 g.ArchivedAcademicYear,
                 g.AssignedPrinterId,
-                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null
+                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null,
+                g.Type
             ))
             .FirstOrDefaultAsync();
         
@@ -189,7 +192,8 @@ public class GroupsController : ControllerBase
                 g.IsArchived,
                 g.ArchivedAcademicYear,
                 g.AssignedPrinterId,
-                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null))
+                g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null,
+                g.Type))
             .ToListAsync();
 
         return Ok(result);
@@ -235,6 +239,7 @@ public class GroupsController : ControllerBase
         {
             GroupId = group.Id,
             GroupName = group.Name,
+            GroupType = group.Type,
             BranchName = group.Branch?.Name ?? string.Empty,
             Students = group.Students.Where(s => s != null).Select(s => new
             {
@@ -290,6 +295,7 @@ public class GroupsController : ControllerBase
         {
             GroupId = group.Id,
             GroupName = group.Name,
+            GroupType = group.Type,
             Location = group.Branch?.Name ?? string.Empty,
             Students = group.Students.Where(s => s != null).Select(s => new
             {

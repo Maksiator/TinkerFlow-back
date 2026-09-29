@@ -1,9 +1,12 @@
+using TinkerFlow.Domain.Enums;
+
 namespace TinkerFlow.Domain.Entities;
 
 public class Group
 {
     public Guid Id { get; set; }
     public string Name { get; set; } = string.Empty;
+    public GroupType Type { get; set; } = GroupType.Standard;
     
     public Guid BranchId { get; set; }
     public Branch Branch { get; set; } = null!;

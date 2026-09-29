@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TinkerFlow.API.DTOs;
 using TinkerFlow.Domain.Entities;
+using TinkerFlow.Domain.Enums;
 using TinkerFlow.Infrastructure;
 
 namespace TinkerFlow.API.Controllers;
@@ -20,10 +21,24 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetProjects()
+    public async Task<IActionResult> GetProjects([FromQuery] ProjectSoftware? software = null, [FromQuery] bool? isAdvanced = null)
     {
-        var projects = await _context.Projects
-            .OrderBy(p => p.SequenceOrder)
+        var query = _context.Projects.AsNoTracking().AsQueryable();
+
+        if (software.HasValue)
+        {
+            query = query.Where(p => p.Software == software.Value);
+        }
+
+        if (isAdvanced.HasValue)
+        {
+            query = query.Where(p => p.IsAdvanced == isAdvanced.Value);
+        }
+
+        var projects = await query
+            .OrderBy(p => p.Software)
+            .ThenBy(p => p.IsAdvanced)
+            .ThenBy(p => p.SequenceOrder)
             .ToListAsync();
         return Ok(projects);
     }
@@ -43,7 +58,9 @@ public class ProjectsController : ControllerBase
             project.Code, 
             project.SequenceOrder, 
             project.IsPractice, 
-            project.IsYearBoundary
+            project.IsYearBoundary,
+            project.Software,
+            project.IsAdvanced
         ));
     }
     
@@ -67,7 +84,9 @@ public class ProjectsController : ControllerBase
             Code = request.Code,
             SequenceOrder = request.SequenceOrder,
             IsPractice = request.IsPractice,
-            IsYearBoundary = request.IsYearBoundary
+            IsYearBoundary = request.IsYearBoundary,
+            Software = request.Software,
+            IsAdvanced = request.IsAdvanced
         };
 
         _context.Projects.Add(newProject);
@@ -79,7 +98,9 @@ public class ProjectsController : ControllerBase
             newProject.Code, 
             newProject.SequenceOrder, 
             newProject.IsPractice, 
-            newProject.IsYearBoundary
+            newProject.IsYearBoundary,
+            newProject.Software,
+            newProject.IsAdvanced
         );
         
         return CreatedAtAction(nameof(GetProject), new { id = newProject.Id }, response);
@@ -118,7 +139,9 @@ public class ProjectsController : ControllerBase
                     Code = codeTrimmed, 
                     SequenceOrder = req.SequenceOrder,
                     IsPractice = req.IsPractice,
-                    IsYearBoundary = req.IsYearBoundary
+                    IsYearBoundary = req.IsYearBoundary,
+                    Software = req.Software,
+                    IsAdvanced = req.IsAdvanced
                 });
             }
         }
@@ -148,6 +171,8 @@ public class ProjectsController : ControllerBase
         existingProject.SequenceOrder = request.SequenceOrder;
         existingProject.IsPractice = request.IsPractice;
         existingProject.IsYearBoundary = request.IsYearBoundary;
+        existingProject.Software = request.Software;
+        existingProject.IsAdvanced = request.IsAdvanced;
 
         await _context.SaveChangesAsync();
 

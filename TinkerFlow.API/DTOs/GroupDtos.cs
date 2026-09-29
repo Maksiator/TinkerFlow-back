@@ -1,3 +1,5 @@
+using TinkerFlow.Domain.Enums;
+
 namespace TinkerFlow.API.DTOs;
 
 public record CreateGroupRequest(
@@ -5,7 +7,8 @@ public record CreateGroupRequest(
     Guid BranchId,
     DayOfWeek? ClassDayOfWeek,
     Guid? PrimaryTrainerId = null,
-    Guid? AssignedPrinterId = null
+    Guid? AssignedPrinterId = null,
+    GroupType Type = GroupType.Standard
 );
 
 public record UpdateGroupRequest(
@@ -13,7 +16,8 @@ public record UpdateGroupRequest(
     Guid BranchId,
     DayOfWeek? ClassDayOfWeek,
     Guid? PrimaryTrainerId = null,
-    Guid? AssignedPrinterId = null
+    Guid? AssignedPrinterId = null,
+    GroupType Type = GroupType.Standard
 );
 
 public record GroupResponse(
@@ -28,7 +32,8 @@ public record GroupResponse(
     bool IsArchived = false,
     string? ArchivedAcademicYear = null,
     Guid? AssignedPrinterId = null,
-    string? AssignedPrinterName = null
+    string? AssignedPrinterName = null,
+    GroupType Type = GroupType.Standard
 )
 {
     public GroupResponse(
@@ -42,7 +47,7 @@ public record GroupResponse(
         DayOfWeek? classDayOfWeek,
         bool isArchived,
         string? archivedAcademicYear)
-        : this(id, name, branchId, branchName, primaryTrainerId, primaryTrainerName, studentCount, classDayOfWeek, isArchived, archivedAcademicYear, null, null)
+        : this(id, name, branchId, branchName, primaryTrainerId, primaryTrainerName, studentCount, classDayOfWeek, isArchived, archivedAcademicYear, null, null, GroupType.Standard)
     {
     }
 }

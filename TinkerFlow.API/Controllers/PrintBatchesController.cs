@@ -45,11 +45,21 @@ public class PrintBatchesController : ControllerBase
 
         try
         {
-            var groupExists = await _context.Groups.AnyAsync(g => g.Id == request.GroupId);
-            if (!groupExists)
+            var group = await _context.Groups.FirstOrDefaultAsync(g => g.Id == request.GroupId);
+            if (group == null)
             {
                 _logger.LogWarning("Trener {TrainerId} próbował wysłać paczkę dla nieistniejącej grupy {GroupId}.", trainerId, request.GroupId);
                 return NotFound(new { message = "Podana grupa nie istnieje w systemie." });
+            }
+
+            if (group.Type == GroupType.Standard && request.ProjectsToPrint.Any(p => p.ProjectId.HasValue))
+            {
+                var projectIds = request.ProjectsToPrint.Where(p => p.ProjectId.HasValue).Select(p => p.ProjectId!.Value).ToList();
+                var hasSolidWorks = await _context.Projects.AnyAsync(p => projectIds.Contains(p.Id) && p.Software == ProjectSoftware.SolidWorks);
+                if (hasSolidWorks)
+                {
+                    return BadRequest(new { message = "Projekty SolidWorks mogą być realizowane i drukowane wyłącznie w grupach zaawansowanych." });
+                }
             }
 
             var settings = await _context.SystemSettings.FirstOrDefaultAsync();
