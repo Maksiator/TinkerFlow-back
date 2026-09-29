@@ -69,7 +69,7 @@ public class GroupsController : ControllerBase
             PrimaryTrainerId = request.PrimaryTrainerId,
             AssignedPrinterId = request.AssignedPrinterId,
             ClassDayOfWeek = request.ClassDayOfWeek,
-            Type = request.Type
+            Type = userRoleStr == "Admin" ? request.Type : GroupType.Standard
         };
         
         _context.Groups.Add(newGroup);
@@ -119,7 +119,12 @@ public class GroupsController : ControllerBase
         group.PrimaryTrainerId = request.PrimaryTrainerId;
         group.AssignedPrinterId = request.AssignedPrinterId;
         group.ClassDayOfWeek = request.ClassDayOfWeek;
-        group.Type = request.Type;
+        
+        // Tylko Administrator może zmieniać typ grupy na Zaawansowaną
+        if (userRoleStr == "Admin")
+        {
+            group.Type = request.Type;
+        }
 
         await _context.SaveChangesAsync();
 
