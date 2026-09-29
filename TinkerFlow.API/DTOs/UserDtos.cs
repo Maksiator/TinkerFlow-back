@@ -10,7 +10,8 @@ public record CreateUserRequest(
     string Password,
     TinkerFlow.Domain.Enums.UserRole Role,
     List<Guid> BranchIds, // NOWE: Lista oddziałów do przypisania przy tworzeniu
-    bool? CanActAsTrainer = null
+    bool? CanActAsTrainer = null,
+    bool? CanActAsPrinter = null
 );
 
 public record UpdateUserRequest(
@@ -19,7 +20,8 @@ public record UpdateUserRequest(
     TinkerFlow.Domain.Enums.UserRole Role,
     List<Guid> BranchIds, // NOWE: Lista oddziałów po aktualizacji
     bool? CanActAsTrainer = null,
-    string? Email = null
+    string? Email = null,
+    bool? CanActAsPrinter = null
 );
 
 public record UpdateProfileRequest(
@@ -43,7 +45,8 @@ public record UserResponse(
     bool IsActive,
     List<UserBranchDto> Branches, // NOWE: Lista oddziałów użytkownika
     bool MustChangePassword,
-    bool CanActAsTrainer = false
+    bool CanActAsTrainer = false,
+    bool CanActAsPrinter = false
 );
 
 public record ChangePasswordRequest(

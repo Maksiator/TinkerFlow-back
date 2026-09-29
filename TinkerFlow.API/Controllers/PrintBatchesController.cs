@@ -281,10 +281,25 @@ public class PrintBatchesController : ControllerBase
             // Drukarz widzi tylko paczki z grup bezpośrednio do niego przypisanych
             query = query.Where(pb => pb.Group != null && pb.Group.AssignedPrinterId == user.Id);
         }
-        else if (user.Role != UserRole.Admin)
+        else if (user.Role == UserRole.Coordinator)
         {
+            // Koordynator widzi wszystkie paczki w obrębie swoich oddziałów
             var allowedBranchIds = user.UserBranches.Select(ub => ub.BranchId).ToList();
             query = query.Where(pb => pb.Group != null && allowedBranchIds.Contains(pb.Group.BranchId));
+        }
+        else if (user.Role == UserRole.Trainer)
+        {
+            // Trener musi posiadać flagę CanActAsPrinter
+            if (!user.CanActAsPrinter)
+            {
+                return Forbid();
+            }
+            // Trener widzi wyłącznie paczki ze swoich grup (przypisany jako drukarz lub główny trener grupy)
+            query = query.Where(pb => pb.Group != null && (pb.Group.AssignedPrinterId == user.Id || pb.Group.PrimaryTrainerId == user.Id));
+        }
+        else if (user.Role != UserRole.Admin)
+        {
+            return Forbid();
         }
 
         // Domyślnie pomijamy zakończone zlecenia, chyba że includeCompleted = true
@@ -403,12 +418,43 @@ public class PrintBatchesController : ControllerBase
     }
 
     [HttpPatch("{batchId:guid}/printer-notes")]
-    [Authorize(Roles = "Admin,Printer")]
+    [Authorize(Roles = "Admin,Printer,Coordinator,Trainer")]
     public async Task<IActionResult> UpdatePrinterNotes(Guid batchId, [FromBody] UpdatePrinterNotesRequest request)
     {
-        var batch = await _context.PrintBatches.FirstOrDefaultAsync(pb => pb.Id == batchId);
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            return Unauthorized();
+
+        var user = await _context.Users
+            .Include(u => u.UserBranches)
+            .FirstOrDefaultAsync(u => u.Id == userId);
+        if (user == null)
+            return Unauthorized();
+
+        var batch = await _context.PrintBatches
+            .Include(pb => pb.Group)
+            .FirstOrDefaultAsync(pb => pb.Id == batchId);
         if (batch == null)
             return NotFound(new { message = "Nie znaleziono podanej paczki." });
+
+        if (user.Role == UserRole.Printer && batch.Group?.AssignedPrinterId != user.Id)
+            return Forbid();
+
+        if (user.Role == UserRole.Coordinator)
+        {
+            var allowedBranchIds = user.UserBranches.Select(ub => ub.BranchId).ToList();
+            if (batch.Group != null && !allowedBranchIds.Contains(batch.Group.BranchId))
+                return Forbid();
+        }
+
+        if (user.Role == UserRole.Trainer)
+        {
+            if (!user.CanActAsPrinter)
+                return Forbid();
+
+            if (batch.Group == null || (batch.Group.AssignedPrinterId != user.Id && batch.Group.PrimaryTrainerId != user.Id))
+                return Forbid();
+        }
 
         batch.PrinterNotes = string.IsNullOrWhiteSpace(request.PrinterNotes) ? null : request.PrinterNotes.Trim();
         await _context.SaveChangesAsync();

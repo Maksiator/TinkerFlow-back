@@ -502,13 +502,13 @@ public class GroupsController : ControllerBase
         }
 
         string? printerName = null;
-        // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer
+        // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer lub jest trenerem z uprawnieniem drukarza
         if (request.PrinterId.HasValue)
         {
             var printerUser = await _context.Users.FindAsync(request.PrinterId.Value);
-            if (printerUser == null || printerUser.Role != UserRole.Printer)
+            if (printerUser == null || (printerUser.Role != UserRole.Printer && !(printerUser.Role == UserRole.Trainer && printerUser.CanActAsPrinter)))
             {
-                return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada roli Drukarza." });
+                return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada uprawnień Drukarza." });
             }
             printerName = $"{printerUser.FirstName} {printerUser.LastName}";
         }

@@ -147,7 +147,8 @@ public class UsersController : ControllerBase
             ub.Branch.Name
         )).ToList(),
         u.MustChangePassword,
-        u.CanActAsTrainer
+        u.CanActAsTrainer,
+        u.CanActAsPrinter
     )).ToList();
 
     return Ok(new PagedResult<UserResponse>(result, totalCount, totalPages, page, pageSize));
@@ -211,6 +212,12 @@ public class UsersController : ControllerBase
             user.CanActAsTrainer = request.CanActAsTrainer.Value;
         }
 
+        // Tylko Administrator może nadać lub odebrać uprawnienia drukarza dla trenera
+        if (currentUser.Role == UserRole.Admin && request.CanActAsPrinter.HasValue)
+        {
+            user.CanActAsPrinter = request.CanActAsPrinter.Value;
+        }
+
         var result = await _userManager.CreateAsync(user, request.Password);
 
         if (!result.Succeeded)
@@ -247,7 +254,7 @@ public class UsersController : ControllerBase
             userRole: currentUser.Role.ToString(),
             ipAddress: HttpContext.GetClientIpAddress());
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword, user.CanActAsTrainer));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email, user.Role, user.IsActive, assignedBranches, user.MustChangePassword, user.CanActAsTrainer, user.CanActAsPrinter));
     }
 
     [HttpPut("{id}")]
@@ -349,6 +356,12 @@ public class UsersController : ControllerBase
             user.CanActAsTrainer = request.CanActAsTrainer.Value;
         }
 
+        // Tylko Administrator może nadać lub odebrać uprawnienia drukarza dla trenera
+        if (currentUser.Role == UserRole.Admin && request.CanActAsPrinter.HasValue)
+        {
+            user.CanActAsPrinter = request.CanActAsPrinter.Value;
+        }
+
         var result = await _userManager.UpdateAsync(user);
 
         if (!result.Succeeded)
@@ -390,7 +403,7 @@ public class UsersController : ControllerBase
             userRole: currentUser.Role.ToString(),
             ipAddress: HttpContext.GetClientIpAddress());
 
-        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword, user.CanActAsTrainer));
+        return Ok(new UserResponse(user.Id, user.FirstName, user.LastName, user.Email!, user.Role, user.IsActive, updatedBranches, user.MustChangePassword, user.CanActAsTrainer, user.CanActAsPrinter));
     }
     
     [HttpPut("{id}/status")]
@@ -566,7 +579,8 @@ public class UsersController : ControllerBase
                 ub.Branch.Name
             )).ToList(),
             user.MustChangePassword,
-            user.CanActAsTrainer
+            user.CanActAsTrainer,
+            user.CanActAsPrinter
         );
 
         return Ok(response);
@@ -631,7 +645,8 @@ public class UsersController : ControllerBase
                 ub.Branch.Name
             )).ToList(),
             user.MustChangePassword,
-            user.CanActAsTrainer
+            user.CanActAsTrainer,
+            user.CanActAsPrinter
         );
 
         return Ok(response);

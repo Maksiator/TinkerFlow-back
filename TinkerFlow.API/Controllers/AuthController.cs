@@ -67,7 +67,7 @@ public class AuthController : ControllerBase
 
         await _auditLogService.LogAsync("Auth", "LoginSuccess", "Pomyślne logowanie do systemu", userId: user.Id, userEmail: user.Email, userName: $"{user.FirstName} {user.LastName}", userRole: user.Role.ToString(), ipAddress: ipAddress);
         
-        return Ok(new AuthResponse(token, user.Id, user.FirstName, user.LastName, user.Role, user.MustChangePassword));
+        return Ok(new AuthResponse(token, user.Id, user.FirstName, user.LastName, user.Role, user.MustChangePassword, user.CanActAsPrinter));
     }
 
     private string GenerateJwtToken(User user)
