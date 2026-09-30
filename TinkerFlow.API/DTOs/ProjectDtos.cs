@@ -55,4 +55,9 @@ public record ProjectUsageResponse(
 public record MergeProjectsRequest(
     Guid SourceProjectId, 
     Guid TargetProjectId
-    );
+);
+
+public record ProjectOrderItemDto(
+    Guid Id,
+    int SequenceOrder
+);

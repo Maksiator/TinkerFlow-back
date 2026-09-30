@@ -284,7 +284,30 @@ public class ProjectsController : ControllerBase
 
         return Ok(new { message = $"Pomyślnie przeniesiono uczniów i usunięto projekt {sourceProject.Name}" });
     }
-    
-    
+
+    [HttpPost("reorder")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> ReorderProjects([FromBody] List<ProjectOrderItemDto> items)
+    {
+        if (items == null || !items.Any())
+        {
+            return BadRequest(new { message = "Lista zmian kolejności jest pusta." });
+        }
+
+        var ids = items.Select(i => i.Id).ToList();
+        var projects = await _context.Projects.Where(p => ids.Contains(p.Id)).ToListAsync();
+
+        var itemsDict = items.ToDictionary(i => i.Id, i => i.SequenceOrder);
+        foreach (var project in projects)
+        {
+            if (itemsDict.TryGetValue(project.Id, out var newOrder))
+            {
+                project.SequenceOrder = newOrder;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+        return Ok(new { message = $"Zaktualizowano kolejność dla {projects.Count} projektów." });
+    }
 }
 
