@@ -44,7 +44,8 @@ public record StudentResponse(
     bool NeedsAttention,
     Guid? GroupId,
     string? GroupName,
-    Guid? BranchId = null
+    Guid? BranchId = null,
+    bool IsAdvancedGroup = false
 );
 
 public record BulkDeleteStudentsRequest(

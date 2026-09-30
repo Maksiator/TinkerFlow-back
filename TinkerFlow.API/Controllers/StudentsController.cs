@@ -125,7 +125,8 @@ public class StudentsController : ControllerBase
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
                 s.Group != null ? s.Group.Name : null,
-                s.BranchId
+                s.BranchId,
+                s.Group != null && s.Group.Type == GroupType.Advanced
             ))
             .ToListAsync();
 
@@ -154,7 +155,8 @@ public class StudentsController : ControllerBase
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
                 s.Group != null ? s.Group.Name : null,
-                s.BranchId
+                s.BranchId,
+                s.Group != null && s.Group.Type == GroupType.Advanced
             ))
             .ToListAsync();
 
@@ -197,7 +199,8 @@ public class StudentsController : ControllerBase
                 s.Id, s.FirstName, s.LastName, s.DateOfBirth, s.Level, 
                 s.IsIndependent, s.NeedsAttention, s.GroupId, 
                 s.Group != null ? s.Group.Name : null,
-                s.BranchId
+                s.BranchId,
+                s.Group != null && s.Group.Type == GroupType.Advanced
             ))
             .ToListAsync();
 
@@ -246,7 +249,8 @@ public class StudentsController : ControllerBase
         var response = new StudentResponse(
             student.Id, student.FirstName, student.LastName, student.DateOfBirth, student.Level, 
             student.IsIndependent, student.NeedsAttention, student.GroupId, 
-            student.Group?.Name, student.BranchId
+            student.Group?.Name, student.BranchId,
+            student.Group != null && student.Group.Type == GroupType.Advanced
         );
 
         return Ok(response);
@@ -316,14 +320,14 @@ public class StudentsController : ControllerBase
         _context.Students.Add(newStudent);
         await _context.SaveChangesAsync();
 
-        var groupName = request.GroupId.HasValue
-            ? await _context.Groups.Where(g => g.Id == request.GroupId.Value).Select(g => g.Name).FirstOrDefaultAsync()
+        var groupInfo = request.GroupId.HasValue
+            ? await _context.Groups.Where(g => g.Id == request.GroupId.Value).Select(g => new { g.Name, g.Type }).FirstOrDefaultAsync()
             : null;
 
         await _auditLogService.LogAsync(
             "Students",
             "CreateStudent",
-            $"Dodano ucznia {newStudent.FirstName} {newStudent.LastName}" + (groupName != null ? $" do grupy '{groupName}'" : ""),
+            $"Dodano ucznia {newStudent.FirstName} {newStudent.LastName}" + (groupInfo != null ? $" do grupy '{groupInfo.Name}'" : ""),
             entityId: newStudent.Id,
             entityName: $"{newStudent.FirstName} {newStudent.LastName}",
             ipAddress: HttpContext.GetClientIpAddress());
@@ -331,7 +335,8 @@ public class StudentsController : ControllerBase
         var response = new StudentResponse(
             newStudent.Id, newStudent.FirstName, newStudent.LastName, newStudent.DateOfBirth,
             newStudent.Level, newStudent.IsIndependent, newStudent.NeedsAttention,
-            newStudent.GroupId, groupName, newStudent.BranchId
+            newStudent.GroupId, groupInfo?.Name, newStudent.BranchId,
+            groupInfo != null && groupInfo.Type == GroupType.Advanced
         );
         return CreatedAtAction(nameof(GetStudent), new { id = newStudent.Id }, response);
     }
