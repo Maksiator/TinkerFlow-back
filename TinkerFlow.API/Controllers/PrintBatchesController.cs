@@ -361,6 +361,193 @@ public class PrintBatchesController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("summary")]
+    [Authorize(Roles = "Admin,Printer,Coordinator")]
+    public async Task<IActionResult> GetPrinterSummary(
+        [FromQuery] DateTime? fromDate,
+        [FromQuery] DateTime? toDate,
+        [FromQuery] Guid? printerId,
+        [FromQuery] string? dateField = "lessonDate")
+    {
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var currentUserId))
+            return Unauthorized();
+
+        var currentUser = await _context.Users
+            .Include(u => u.UserBranches)
+            .FirstOrDefaultAsync(u => u.Id == currentUserId);
+
+        if (currentUser == null)
+            return Unauthorized();
+
+        Guid? targetPrinterId = null;
+        if (currentUser.Role == UserRole.Printer)
+        {
+            targetPrinterId = currentUser.Id;
+        }
+        else if (currentUser.Role == UserRole.Admin || currentUser.Role == UserRole.Coordinator)
+        {
+            targetPrinterId = printerId;
+        }
+
+        var query = _context.PrintBatches
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.Branch)
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.AssignedPrinter)
+            .Include(pb => pb.PrintJobs)
+                .ThenInclude(pj => pj.Student)
+            .Include(pb => pb.PrintJobs)
+                .ThenInclude(pj => pj.StudentProject)
+                    .ThenInclude(sp => sp!.Project)
+            .Where(pb => pb.Status != PrintBatchState.NoPrints)
+            .AsQueryable();
+
+        if (targetPrinterId.HasValue)
+        {
+            query = query.Where(pb => pb.Group != null && pb.Group.AssignedPrinterId == targetPrinterId.Value);
+        }
+
+        if (currentUser.Role == UserRole.Coordinator)
+        {
+            var allowedBranchIds = currentUser.UserBranches.Select(ub => ub.BranchId).ToList();
+            query = query.Where(pb => pb.Group != null && allowedBranchIds.Contains(pb.Group.BranchId));
+        }
+
+        if (fromDate.HasValue)
+        {
+            var fromUtc = DateTime.SpecifyKind(fromDate.Value.Date, DateTimeKind.Utc);
+            if (dateField == "createdAt")
+                query = query.Where(pb => pb.CreatedAt >= fromUtc);
+            else
+                query = query.Where(pb => pb.LessonDate >= fromUtc);
+        }
+
+        if (toDate.HasValue)
+        {
+            var toUtc = DateTime.SpecifyKind(toDate.Value.Date.AddDays(1).AddTicks(-1), DateTimeKind.Utc);
+            if (dateField == "createdAt")
+                query = query.Where(pb => pb.CreatedAt <= toUtc);
+            else
+                query = query.Where(pb => pb.LessonDate <= toUtc);
+        }
+
+        var batches = await query
+            .OrderByDescending(pb => pb.LessonDate)
+            .ThenByDescending(pb => pb.CreatedAt)
+            .ToListAsync();
+
+        var groupsMap = new Dictionary<Guid, (Group Group, List<PrintBatch> Batches)>();
+
+        foreach (var b in batches)
+        {
+            var gId = b.GroupId;
+            if (!groupsMap.TryGetValue(gId, out var tuple))
+            {
+                tuple = (b.Group, new List<PrintBatch>());
+                groupsMap[gId] = tuple;
+            }
+            tuple.Batches.Add(b);
+        }
+
+        int totalModelsPrinted = 0;
+        int totalModelsFailed = 0;
+        int totalBatchesCompleted = 0;
+
+        var groupsSummary = new List<PrinterGroupSummaryDto>();
+
+        foreach (var entry in groupsMap)
+        {
+            var group = entry.Value.Group;
+            var groupBatches = entry.Value.Batches;
+
+            int groupModelsPrinted = 0;
+            int groupModelsFailed = 0;
+            int groupBatchesCompleted = 0;
+
+            var batchSummaries = new List<PrinterBatchSummaryDto>();
+
+            foreach (var b in groupBatches)
+            {
+                var isBatchCompleted = b.Status == PrintBatchState.ReadyForCollection || b.Status == PrintBatchState.Completed;
+                if (isBatchCompleted)
+                {
+                    groupBatchesCompleted++;
+                }
+
+                int batchPrinted = 0;
+                int batchFailed = 0;
+                var jobsList = new List<PrinterJobSummaryDto>();
+
+                foreach (var pj in b.PrintJobs)
+                {
+                    bool isJobPrinted = pj.Status == PrintJobsStates.Printed || (isBatchCompleted && pj.Status != PrintJobsStates.Failed);
+                    bool isJobFailed = pj.Status == PrintJobsStates.Failed;
+
+                    if (isJobPrinted) batchPrinted++;
+                    if (isJobFailed) batchFailed++;
+
+                    var studentName = pj.Student != null
+                        ? $"{pj.Student.FirstName} {pj.Student.LastName}".Trim()
+                        : "Nieznany uczeń";
+
+                    var projectName = pj.StudentProjectId.HasValue && pj.StudentProject?.Project != null
+                        ? pj.StudentProject.Project.Name
+                        : (pj.CustomName ?? "Projekt własny");
+
+                    jobsList.Add(new PrinterJobSummaryDto(
+                        pj.Id,
+                        studentName,
+                        projectName,
+                        pj.Status
+                    ));
+                }
+
+                groupModelsPrinted += batchPrinted;
+                groupModelsFailed += batchFailed;
+
+                batchSummaries.Add(new PrinterBatchSummaryDto(
+                    b.Id,
+                    b.LessonDate,
+                    b.CreatedAt,
+                    b.Status,
+                    batchPrinted,
+                    batchFailed,
+                    jobsList
+                ));
+            }
+
+            totalModelsPrinted += groupModelsPrinted;
+            totalModelsFailed += groupModelsFailed;
+            totalBatchesCompleted += groupBatchesCompleted;
+
+            var printerName = group.AssignedPrinter != null
+                ? $"{group.AssignedPrinter.FirstName} {group.AssignedPrinter.LastName}".Trim()
+                : null;
+
+            groupsSummary.Add(new PrinterGroupSummaryDto(
+                group.Id,
+                group.Name,
+                group.Branch?.Name,
+                printerName,
+                groupModelsPrinted,
+                groupModelsFailed,
+                groupBatches.Count,
+                batchSummaries
+            ));
+        }
+
+        var response = new PrinterSummaryResponse(
+            totalModelsPrinted,
+            totalModelsFailed,
+            totalBatchesCompleted,
+            groupsSummary.Count,
+            groupsSummary.OrderByDescending(g => g.ModelsPrintedCount).ToList()
+        );
+
+        return Ok(response);
+    }
+
     [HttpPatch("{batchId:guid}/status")]
     public async Task<IActionResult> UpdateBatchStatus(Guid batchId, [FromBody] UpdatePrintBatchStatusRequest request)
     {

@@ -89,3 +89,43 @@ public record UpdatePrintJobStatusRequest(
 public record ConfirmDeliveryRequest(
     [Required] List<Guid> ConfirmedStudentProjectIds
 );
+
+// ==========================================
+// 4. KONTRAKTY PODSUMOWANIA / ROZLICZENIA
+// ==========================================
+
+public record PrinterSummaryResponse(
+    int TotalModelsPrinted,
+    int TotalModelsFailed,
+    int TotalBatchesCompleted,
+    int TotalGroups,
+    List<PrinterGroupSummaryDto> GroupsSummary
+);
+
+public record PrinterGroupSummaryDto(
+    Guid GroupId,
+    string GroupName,
+    string? BranchName,
+    string? AssignedPrinterName,
+    int ModelsPrintedCount,
+    int ModelsFailedCount,
+    int BatchesCount,
+    List<PrinterBatchSummaryDto> Batches
+);
+
+public record PrinterBatchSummaryDto(
+    Guid BatchId,
+    DateTime LessonDate,
+    DateTime CreatedAt,
+    PrintBatchState Status,
+    int ModelsPrintedCount,
+    int ModelsFailedCount,
+    List<PrinterJobSummaryDto> Jobs
+);
+
+public record PrinterJobSummaryDto(
+    Guid JobId,
+    string StudentName,
+    string ProjectName,
+    PrintJobsStates Status
+);
