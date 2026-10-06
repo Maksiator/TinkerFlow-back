@@ -584,8 +584,8 @@ public class PrintBatchesController : ControllerBase
             }
             else if (request.Status == PrintBatchState.ReadyForCollection)
             {
-                // Jeśli paczka jest gotowa, wszystkie drukujące się modele są Zakończone.
-                // UWAGA: Nie ruszamy tych ze statusem "Failed", jeśli drukarz je tak oznaczył!
+                // Jeśli paczka jest oznaczana jako gotowa do odbioru:
+                // Drukujące się i oczekujące modele zmieniamy na Printed, chyba że drukarz oznaczył je jako Failed.
                 foreach (var job in batch.PrintJobs.Where(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Pending))
                 {
                     job.Status = PrintJobsStates.Printed;
@@ -593,7 +593,7 @@ public class PrintBatchesController : ControllerBase
             }
             else if (request.Status == PrintBatchState.Completed)
             {
-                // Jeśli paczka jest zamykana bez wydruków (lub oznaczona jako zakończona)
+                // Jeśli paczka jest bezpośrednio zamykana (Completed)
                 foreach (var job in batch.PrintJobs.Where(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Pending))
                 {
                     job.Status = PrintJobsStates.Failed;
@@ -716,32 +716,8 @@ public class PrintBatchesController : ControllerBase
             {
                 var allJobs = batch.PrintJobs?.ToList() ?? new List<PrintJob>();
 
-                // 1. Jeśli w całej paczce WSZYSTKIE modele są niewydrukowane (Failed / brak wydruku) -> paczka od razu przechodzi w stan Zakończone (Completed)
-                if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Failed))
-                {
-                    batch.Status = PrintBatchState.Completed;
-
-                    // Cofamy projekty na matrycy ze stanu SentToPrint do InProgress, by trener widział, że wymagają wydrukowania
-                    var failedProjectIds = allJobs
-                        .Where(j => j.StudentProjectId.HasValue)
-                        .Select(j => j.StudentProjectId!.Value)
-                        .ToList();
-
-                    if (failedProjectIds.Any())
-                    {
-                        var studentProjects = await _context.StudentProjects
-                            .Where(sp => failedProjectIds.Contains(sp.Id))
-                            .ToListAsync();
-
-                        foreach (var sp in studentProjects)
-                        {
-                            sp.Status = ProjectState.InProgress;
-                        }
-                    }
-                }
-                // 2. Jeśli wszystkie modele w paczce zostały rozstrzygnięte i co najmniej 1 został wydrukowany -> Do odbioru
-                else if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed)
-                    && allJobs.Any(j => j.Status == PrintJobsStates.Printed))
+                // 1. Jeśli wszystkie modele w paczce zostały rozstrzygnięte (Printed lub Failed) -> Do odbioru (nawet jeśli nic nie wydrukowano, by trener otrzymał informację i potwierdził fikcyjny odbiór)
+                if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed))
                 {
                     batch.Status = PrintBatchState.ReadyForCollection;
                 }
