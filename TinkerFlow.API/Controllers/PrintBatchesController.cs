@@ -591,6 +591,32 @@ public class PrintBatchesController : ControllerBase
                     job.Status = PrintJobsStates.Printed;
                 }
             }
+            else if (request.Status == PrintBatchState.Completed)
+            {
+                // Jeśli paczka jest zamykana bez wydruków (lub oznaczona jako zakończona)
+                foreach (var job in batch.PrintJobs.Where(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Pending))
+                {
+                    job.Status = PrintJobsStates.Failed;
+                }
+
+                // Projekty które nie zostały wydrukowane (Failed), cofamy na matrycy z SentToPrint do InProgress
+                var failedProjectIds = batch.PrintJobs
+                    .Where(j => j.Status == PrintJobsStates.Failed && j.StudentProjectId.HasValue)
+                    .Select(j => j.StudentProjectId!.Value)
+                    .ToList();
+
+                if (failedProjectIds.Any())
+                {
+                    var studentProjects = await _context.StudentProjects
+                        .Where(sp => failedProjectIds.Contains(sp.Id))
+                        .ToListAsync();
+
+                    foreach (var sp in studentProjects)
+                    {
+                        sp.Status = ProjectState.InProgress;
+                    }
+                }
+            }
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -686,22 +712,45 @@ public class PrintBatchesController : ControllerBase
             job.Status = request.Status;
 
             var batch = job.PrintBatch;
-            if (batch != null && batch.Status != PrintBatchState.Completed && batch.Status != PrintBatchState.NoPrints)
+            if (batch != null && batch.Status != PrintBatchState.NoPrints)
             {
                 var allJobs = batch.PrintJobs?.ToList() ?? new List<PrintJob>();
 
-                // 1. Jeśli wszystkie modele w paczce zostały wydrukowane (lub zepsute, ale co najmniej 1 wydrukowany i zero w toku/oczekujących)
-                if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed)
+                // 1. Jeśli w całej paczce WSZYSTKIE modele są niewydrukowane (Failed / brak wydruku) -> paczka od razu przechodzi w stan Zakończone (Completed)
+                if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Failed))
+                {
+                    batch.Status = PrintBatchState.Completed;
+
+                    // Cofamy projekty na matrycy ze stanu SentToPrint do InProgress, by trener widział, że wymagają wydrukowania
+                    var failedProjectIds = allJobs
+                        .Where(j => j.StudentProjectId.HasValue)
+                        .Select(j => j.StudentProjectId!.Value)
+                        .ToList();
+
+                    if (failedProjectIds.Any())
+                    {
+                        var studentProjects = await _context.StudentProjects
+                            .Where(sp => failedProjectIds.Contains(sp.Id))
+                            .ToListAsync();
+
+                        foreach (var sp in studentProjects)
+                        {
+                            sp.Status = ProjectState.InProgress;
+                        }
+                    }
+                }
+                // 2. Jeśli wszystkie modele w paczce zostały rozstrzygnięte i co najmniej 1 został wydrukowany -> Do odbioru
+                else if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Printed || j.Status == PrintJobsStates.Failed)
                     && allJobs.Any(j => j.Status == PrintJobsStates.Printed))
                 {
                     batch.Status = PrintBatchState.ReadyForCollection;
                 }
-                // 2. Jeśli jakikolwiek model jest w druku lub został wydrukowany (a nie wszystkie są gotowe)
+                // 3. Jeśli jakikolwiek model jest w druku lub został wydrukowany (a nie wszystkie są gotowe)
                 else if (allJobs.Any(j => j.Status == PrintJobsStates.Printing || j.Status == PrintJobsStates.Printed))
                 {
                     batch.Status = PrintBatchState.Printing;
                 }
-                // 3. Jeśli wszystkie modele są oczekujące (cofnięte)
+                // 4. Jeśli wszystkie modele są oczekujące (cofnięte)
                 else if (allJobs.Count > 0 && allJobs.All(j => j.Status == PrintJobsStates.Pending))
                 {
                     batch.Status = PrintBatchState.Pending;
