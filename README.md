@@ -88,3 +88,11 @@ The API will be available at `http://localhost:8080` (interactive API documentat
 ├── docker-compose.prod.yml     # Production orchestration spec
 └── docker-compose.db.yaml      # Local developer PostgreSQL container
 ```
+
+---
+
+## License
+
+Copyright © 2026 Maksymilian Fijoł. All rights reserved.  
+This repository and its codebase are proprietary. Published strictly for portfolio, architectural review, and hiring evaluation purposes. Unauthorized copying, distribution, modification, or commercial use without prior written permission is strictly prohibited.
+
