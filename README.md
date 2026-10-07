@@ -1,8 +1,8 @@
 # TinkerFlow — Backend API
 
-Backend REST API for **TinkerFlow** — an internal workshop operations and 3D print logistics platform built for mobile extracurricular 3D modeling & 3D printing courses in elementary schools.
+Backend REST API for **TinkerFlow** — an internal operational management and 3D print logistics platform used by field instructors, regional coordinators, and print lab operators managing mobile 3D modeling courses in elementary schools.
 
-Currently supporting **1,000+ active students across 5 regional branches**, generating **1,000–2,000 physical 3D print jobs and state transitions weekly**.
+Currently managing live progress records for **1,000+ students across 5 regional branches**, coordinating **1,000–2,000 physical print jobs and matrix state transitions weekly**.
 
 > **Related repository:** Frontend client available at [TinkerFlow-front](https://github.com/Maksiator/TinkerFlow-front).
 
