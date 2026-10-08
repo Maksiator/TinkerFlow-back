@@ -69,7 +69,8 @@ public class GroupsController : ControllerBase
             PrimaryTrainerId = request.PrimaryTrainerId,
             AssignedPrinterId = request.AssignedPrinterId,
             ClassDayOfWeek = request.ClassDayOfWeek,
-            Type = userRoleStr == "Admin" ? request.Type : GroupType.Standard
+            Type = userRoleStr == "Admin" ? request.Type : GroupType.Standard,
+            TinkercadUrl = request.TinkercadUrl
         };
         
         _context.Groups.Add(newGroup);
@@ -119,6 +120,7 @@ public class GroupsController : ControllerBase
         group.PrimaryTrainerId = request.PrimaryTrainerId;
         group.AssignedPrinterId = request.AssignedPrinterId;
         group.ClassDayOfWeek = request.ClassDayOfWeek;
+        group.TinkercadUrl = request.TinkercadUrl;
         
         // Tylko Administrator może zmieniać typ grupy na Zaawansowaną
         if (userRoleStr == "Admin")
@@ -165,7 +167,8 @@ public class GroupsController : ControllerBase
                 g.ArchivedAcademicYear,
                 g.AssignedPrinterId,
                 g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null,
-                g.Type
+                g.Type,
+                g.TinkercadUrl
             ))
             .FirstOrDefaultAsync();
         
@@ -198,7 +201,8 @@ public class GroupsController : ControllerBase
                 g.ArchivedAcademicYear,
                 g.AssignedPrinterId,
                 g.AssignedPrinter != null ? g.AssignedPrinter.FirstName + " " + g.AssignedPrinter.LastName : null,
-                g.Type))
+                g.Type,
+                g.TinkercadUrl))
             .ToListAsync();
 
         return Ok(result);
@@ -246,6 +250,7 @@ public class GroupsController : ControllerBase
             GroupName = group.Name,
             GroupType = group.Type,
             BranchName = group.Branch?.Name ?? string.Empty,
+            TinkercadUrl = group.TinkercadUrl,
             Students = group.Students.Where(s => s != null).Select(s => new
             {
                 StudentId = s.Id,
@@ -302,6 +307,7 @@ public class GroupsController : ControllerBase
             GroupName = group.Name,
             GroupType = group.Type,
             Location = group.Branch?.Name ?? string.Empty,
+            TinkercadUrl = group.TinkercadUrl,
             Students = group.Students.Where(s => s != null).Select(s => new
             {
                 StudentId = s.Id,

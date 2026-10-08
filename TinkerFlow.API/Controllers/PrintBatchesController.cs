@@ -355,7 +355,8 @@ public class PrintBatchesController : ControllerBase
             pb.Group?.AssignedPrinterId,
             pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
             pb.Group?.ClassDayOfWeek,
-            pb.PrinterNotes
+            pb.PrinterNotes,
+            pb.Group?.TinkercadUrl
         )).ToList();
 
         return Ok(response);
@@ -924,7 +925,8 @@ public class PrintBatchesController : ControllerBase
             batch.Group?.AssignedPrinterId,
             batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
             batch.Group?.ClassDayOfWeek,
-            batch.PrinterNotes
+            batch.PrinterNotes,
+            batch.Group?.TinkercadUrl
         );
 
         return Ok(response);
@@ -1105,7 +1107,8 @@ public class PrintBatchesController : ControllerBase
             pb.Group?.AssignedPrinterId,
             pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
             pb.Group?.ClassDayOfWeek,
-            pb.PrinterNotes
+            pb.PrinterNotes,
+            pb.Group?.TinkercadUrl
         )).ToList();
 
         return Ok(response);

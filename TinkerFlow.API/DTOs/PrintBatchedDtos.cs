@@ -49,7 +49,8 @@ public record PrintBatchResponse(
     Guid? AssignedPrinterId = null,
     string? AssignedPrinterName = null,
     DayOfWeek? ClassDayOfWeek = null,
-    string? PrinterNotes = null
+    string? PrinterNotes = null,
+    string? TinkercadUrl = null
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu

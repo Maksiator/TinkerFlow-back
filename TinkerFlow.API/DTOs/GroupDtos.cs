@@ -8,7 +8,8 @@ public record CreateGroupRequest(
     DayOfWeek? ClassDayOfWeek,
     Guid? PrimaryTrainerId = null,
     Guid? AssignedPrinterId = null,
-    GroupType Type = GroupType.Standard
+    GroupType Type = GroupType.Standard,
+    string? TinkercadUrl = null
 );
 
 public record UpdateGroupRequest(
@@ -17,7 +18,8 @@ public record UpdateGroupRequest(
     DayOfWeek? ClassDayOfWeek,
     Guid? PrimaryTrainerId = null,
     Guid? AssignedPrinterId = null,
-    GroupType Type = GroupType.Standard
+    GroupType Type = GroupType.Standard,
+    string? TinkercadUrl = null
 );
 
 public record GroupResponse(
@@ -33,7 +35,8 @@ public record GroupResponse(
     string? ArchivedAcademicYear = null,
     Guid? AssignedPrinterId = null,
     string? AssignedPrinterName = null,
-    GroupType Type = GroupType.Standard
+    GroupType Type = GroupType.Standard,
+    string? TinkercadUrl = null
 )
 {
     public GroupResponse(
@@ -47,7 +50,7 @@ public record GroupResponse(
         DayOfWeek? classDayOfWeek,
         bool isArchived,
         string? archivedAcademicYear)
-        : this(id, name, branchId, branchName, primaryTrainerId, primaryTrainerName, studentCount, classDayOfWeek, isArchived, archivedAcademicYear, null, null, GroupType.Standard)
+        : this(id, name, branchId, branchName, primaryTrainerId, primaryTrainerName, studentCount, classDayOfWeek, isArchived, archivedAcademicYear, null, null, GroupType.Standard, null)
     {
     }
 }

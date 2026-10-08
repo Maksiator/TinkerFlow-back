@@ -24,6 +24,9 @@ public class Group
     // ustawienie dnia tygodnia odbywania się zajęć
     public DayOfWeek? ClassDayOfWeek { get; set; }
     
+    // Link do klasy Tinkercad
+    public string? TinkercadUrl { get; set; }
+
     // Archiwizacja grupy
     public bool IsArchived { get; set; } = false;
     public string? ArchivedAcademicYear { get; set; }
