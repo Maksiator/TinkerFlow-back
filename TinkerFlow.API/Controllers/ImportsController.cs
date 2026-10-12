@@ -258,9 +258,8 @@ public class ImportsController : ControllerBase
 
             // Śledzenie nowych rekordów, by zapobiec duplikatom w tej samej paczce
             var newSpMap = new Dictionary<(Guid StudentId, Guid ProjectId), StudentProject>();
-
-            // ID rekordów do bezpiecznego usunięcia
-            var spToRemove = new List<StudentProject>();
+            int addedCount = 0;
+            int preservedExistingCount = 0;
 
             for (int i = 0; i < request.Rows.Count; i++)
             {
@@ -281,39 +280,25 @@ public class ImportsController : ControllerBase
                     var state = MapExcelStatus(rawStatus);
                     var key = (student.Id, project.Id);
 
-                    // --- ŻELAZNA ZASADA: 0 (NotStarted) NIE MA PRAWA BYĆ W BAZIE ---
-                    if (state == ProjectState.NotStarted)
+                    // 1. ZASADA BEZPIECZEŃSTWA: Jeśli w bazie jest już status dla tego ucznia i projektu,
+                    // ZOSTAWIA GO NIENARUSZONEGO. Uczeń w nowym roku już nad nim pracuje, zaplanował go,
+                    // skończył lub powtarza – Excel NIGDY nie nadpisuje ani nie cofa istniejącego stanu z bazy.
+                    if (existingSpMap.ContainsKey(key))
                     {
-                        if (newSpMap.ContainsKey(key))
-                        {
-                            newSpMap.Remove(key);
-                        }
-                        else if (existingSpMap.TryGetValue(key, out var spToDelete))
-                        {
-                            // Sprawdzamy czy powiązany z PrintJob, żeby uniknąć błędu FK Restrict!
-                            bool hasPrintJob = await _context.PrintJobs.AnyAsync(pj => pj.StudentProjectId == spToDelete.Id);
-                            if (!hasPrintJob && !spToRemove.Contains(spToDelete))
-                            {
-                                spToRemove.Add(spToDelete);
-                                existingSpMap.Remove(key);
-                            }
-                        }
+                        preservedExistingCount++;
                         continue;
                     }
 
-                    // --- Jeśli jest > 0 (Zaplanowane, W Trakcie, Zrealizowane) ---
-                    if (existingSpMap.TryGetValue(key, out var spExisting))
+                    // 2. Jeśli w Excelu jest brak / NotStarted (0) i w bazie też nie ma nic – nic nie robimy.
+                    // Puste pole w Excelu nigdy nie tworzy rekordu i nigdy nie usuwa istniejących danych.
+                    if (state == ProjectState.NotStarted)
                     {
-                        spToRemove.Remove(spExisting);
-                        spExisting.Status = state;
-                        _context.Entry(spExisting).State = EntityState.Modified;
+                        continue;
                     }
-                    else if (newSpMap.TryGetValue(key, out var spNew))
-                    {
-                        // Jeśli ten sam projekt występuje wielokrotnie w Excelu, aktualizujemy status w paczce
-                        spNew.Status = state;
-                    }
-                    else
+
+                    // 3. W bazie uczeń NIE MA jeszcze tego projektu, a w Excelu ma status (> 0).
+                    // Uzupełniamy brakujący projekt z migracji.
+                    if (!newSpMap.ContainsKey(key))
                     {
                         var record = new StudentProject
                         {
@@ -323,34 +308,30 @@ public class ImportsController : ControllerBase
                             Status = state
                         };
                         newSpMap[key] = record;
+                        addedCount++;
                     }
                 }
             }
 
             using var transaction = await _context.Database.BeginTransactionAsync();
 
-            if (spToRemove.Any())
-            {
-                _context.StudentProjects.RemoveRange(spToRemove);
-            }
-
             if (newSpMap.Any())
             {
                 _context.StudentProjects.AddRange(newSpMap.Values);
+                await _context.SaveChangesAsync();
             }
 
-            await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
             await _auditLogService.LogAsync(
                 "Imports",
                 "ImportProjectsMatrix",
-                $"Zmigrowano statusy projektów dla {columnToStudent.Count} uczniów i {matchedProjects.Count} projektów",
+                $"Zmigrowano matrycę: dodano {addedCount} brakujących projektów, zachowano {preservedExistingCount} istniejących statusów z bazy (uczniów: {columnToStudent.Count})",
                 ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new
             {
-                message = $"Migracja zakończona sukcesem! Pomyślnie zaktualizowano statusy dla {columnToStudent.Count} uczniów i {matchedProjects.Count} projektów."
+                message = $"Migracja zakończona sukcesem! Dodano {addedCount} brakujących projektów. Żadne istniejące statusy uczniów w systemie ({preservedExistingCount}) nie zostały nadpisane ani usunięte."
             });
         }
         catch (Exception ex)
