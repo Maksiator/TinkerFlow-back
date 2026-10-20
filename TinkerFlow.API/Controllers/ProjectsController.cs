@@ -68,20 +68,32 @@ public class ProjectsController : ControllerBase
     [Authorize(Roles = "Admin,Coordinator")]
     public async Task<IActionResult> AddProject([FromBody] CreateProjectRequest request)
     {
-        var exists = await _context.Projects.AnyAsync(p =>
-            p.Name.ToLower() == request.Name.ToLower() ||
-            p.Code.ToLower() == request.Code.ToLower());
+        var trimmedName = request.Name?.Trim() ?? string.Empty;
+        var trimmedCode = request.Code?.Trim() ?? string.Empty;
 
-        if (exists)
+        if (string.IsNullOrWhiteSpace(trimmedName) || string.IsNullOrWhiteSpace(trimmedCode))
         {
-            return Conflict(new {message = "Projekt o tej samej nazwie lub kodzie już istnieje."});
+            return BadRequest(new { message = "Nazwa i kod projektu są wymagane." });
+        }
+
+        var existingProject = await _context.Projects.FirstOrDefaultAsync(p =>
+            p.Name.ToLower() == trimmedName.ToLower() ||
+            p.Code.ToLower() == trimmedCode.ToLower());
+
+        if (existingProject != null)
+        {
+            string reason = existingProject.Code.Equals(trimmedCode, StringComparison.OrdinalIgnoreCase)
+                ? $"Projekt z kodem '{trimmedCode}' już istnieje ({existingProject.Name})."
+                : $"Projekt o nazwie '{trimmedName}' już istnieje (kod: {existingProject.Code}).";
+
+            return Conflict(new { message = reason });
         }
 
         var newProject = new Project
         {
             Id = Guid.NewGuid(),
-            Name = request.Name,
-            Code = request.Code,
+            Name = trimmedName,
+            Code = trimmedCode,
             SequenceOrder = request.SequenceOrder,
             IsPractice = request.IsPractice,
             IsYearBoundary = request.IsYearBoundary,

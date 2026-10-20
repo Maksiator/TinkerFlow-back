@@ -79,12 +79,13 @@ public class UsersController : ControllerBase
 
         if (!string.IsNullOrWhiteSpace(search))
         {
-            var lowerSearch = search.ToLower();
+            var lowerSearch = search.Trim().ToLower();
             usersQuery = usersQuery.Where(u => 
                 u.FirstName.ToLower().Contains(lowerSearch) || 
                 u.LastName.ToLower().Contains(lowerSearch) ||
-                (u.FirstName + " " + lowerSearch).ToLower().Contains(lowerSearch) ||
-                u.Email!.ToLower().Contains(lowerSearch));
+                (u.FirstName + " " + u.LastName).ToLower().Contains(lowerSearch) ||
+                (u.LastName + " " + u.FirstName).ToLower().Contains(lowerSearch) ||
+                (u.Email != null && u.Email.ToLower().Contains(lowerSearch)));
         }
 
         // Sortowanie (domyślnie po oddziale)
