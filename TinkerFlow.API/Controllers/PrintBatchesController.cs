@@ -356,8 +356,8 @@ public class PrintBatchesController : ControllerBase
                 pj.Status
             )).ToList(),
             pb.CreatedAt,
-            pb.Group?.AssignedPrinterId,
-            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
+            pb.IsHandledByOffice ? null : pb.Group?.AssignedPrinterId,
+            pb.IsHandledByOffice ? "Biuro" : (pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null),
             pb.Group?.ClassDayOfWeek,
             pb.PrinterNotes,
             pb.Group?.TinkercadUrl,
@@ -927,8 +927,8 @@ public class PrintBatchesController : ControllerBase
                 pj.Status
             )).ToList(),
             batch.CreatedAt,
-            batch.Group?.AssignedPrinterId,
-            batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
+            batch.IsHandledByOffice ? null : batch.Group?.AssignedPrinterId,
+            batch.IsHandledByOffice ? "Biuro" : (batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null),
             batch.Group?.ClassDayOfWeek,
             batch.PrinterNotes,
             batch.Group?.TinkercadUrl,
@@ -1129,8 +1129,8 @@ public class PrintBatchesController : ControllerBase
                 pj.Status
             )).ToList(),
             batch.CreatedAt,
-            batch.Group?.AssignedPrinterId,
-            batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
+            batch.IsHandledByOffice ? null : batch.Group?.AssignedPrinterId,
+            batch.IsHandledByOffice ? "Biuro" : (batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null),
             batch.Group?.ClassDayOfWeek,
             batch.PrinterNotes,
             batch.Group?.TinkercadUrl,
@@ -1182,8 +1182,8 @@ public class PrintBatchesController : ControllerBase
                 pj.Status
             )).ToList(),
             pb.CreatedAt,
-            pb.Group?.AssignedPrinterId,
-            pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
+            pb.IsHandledByOffice ? null : pb.Group?.AssignedPrinterId,
+            pb.IsHandledByOffice ? "Biuro" : (pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null),
             pb.Group?.ClassDayOfWeek,
             pb.PrinterNotes,
             pb.Group?.TinkercadUrl,

@@ -8,4 +8,8 @@ public class SystemSetting
     public int SubstituteDaysAfter { get; set; } = 2;
     public int PrintDeadlineDays { get; set; } = 6;
     public string CurrentAcademicYear { get; set; } = "2024/2025";
+
+    // Użytkownik reprezentujący Biuro (realizator wydruków biurowych)
+    public Guid? OfficePrinterUserId { get; set; }
+    public User? OfficePrinterUser { get; set; }
 }

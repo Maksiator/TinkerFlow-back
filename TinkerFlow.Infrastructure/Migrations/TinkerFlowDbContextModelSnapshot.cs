@@ -550,6 +550,9 @@ namespace TinkerFlow.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<Guid?>("OfficePrinterUserId")
+                        .HasColumnType("uuid");
+
                     b.Property<int>("PrintDeadlineDays")
                         .HasColumnType("integer");
 
@@ -560,6 +563,8 @@ namespace TinkerFlow.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("OfficePrinterUserId");
 
                     b.ToTable("SystemSettings");
                 });
@@ -902,6 +907,16 @@ namespace TinkerFlow.Infrastructure.Migrations
                     b.Navigation("Project");
 
                     b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("TinkerFlow.Domain.Entities.SystemSetting", b =>
+                {
+                    b.HasOne("TinkerFlow.Domain.Entities.User", "OfficePrinterUser")
+                        .WithMany()
+                        .HasForeignKey("OfficePrinterUserId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("OfficePrinterUser");
                 });
 
             modelBuilder.Entity("TinkerFlow.Domain.Entities.TrainerGroupList", b =>

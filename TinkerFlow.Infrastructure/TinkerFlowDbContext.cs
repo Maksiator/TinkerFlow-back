@@ -119,5 +119,12 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             entity.HasIndex(a => a.UserId);
             entity.HasIndex(a => new { a.Category, a.Timestamp });
         });
+
+        // 8. Relacja SystemSetting -> OfficePrinterUser
+        builder.Entity<SystemSetting>()
+            .HasOne(s => s.OfficePrinterUser)
+            .WithMany()
+            .HasForeignKey(s => s.OfficePrinterUserId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -22,19 +22,27 @@ public class SystemSettingsController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetSettings()
     {
-        var settings = await _context.SystemSettings.FirstOrDefaultAsync();
+        var settings = await _context.SystemSettings
+            .Include(s => s.OfficePrinterUser)
+            .FirstOrDefaultAsync();
         
         if (settings == null)
         {
             // Fallback
-            return Ok(new SystemSettingsResponse(2, 2, 6, "2024/2025"));
+            return Ok(new SystemSettingsResponse(2, 2, 6, "2024/2025", null, null));
         }
+
+        var userName = settings.OfficePrinterUser != null 
+            ? $"{settings.OfficePrinterUser.FirstName} {settings.OfficePrinterUser.LastName}".Trim() 
+            : null;
 
         return Ok(new SystemSettingsResponse(
             settings.SubstituteDaysBefore, 
             settings.SubstituteDaysAfter,
             settings.PrintDeadlineDays,
-            settings.CurrentAcademicYear));
+            settings.CurrentAcademicYear,
+            settings.OfficePrinterUserId,
+            userName));
     }
 
     [HttpPut]
@@ -61,7 +69,8 @@ public class SystemSettingsController : ControllerBase
                 SubstituteDaysBefore = request.SubstituteDaysBefore,
                 SubstituteDaysAfter = request.SubstituteDaysAfter,
                 PrintDeadlineDays = request.PrintDeadlineDays,
-                CurrentAcademicYear = request.CurrentAcademicYear
+                CurrentAcademicYear = request.CurrentAcademicYear,
+                OfficePrinterUserId = request.OfficePrinterUserId
             };
             _context.SystemSettings.Add(settings);
         }
@@ -71,14 +80,25 @@ public class SystemSettingsController : ControllerBase
             settings.SubstituteDaysAfter = request.SubstituteDaysAfter;
             settings.PrintDeadlineDays = request.PrintDeadlineDays;
             settings.CurrentAcademicYear = request.CurrentAcademicYear;
+            settings.OfficePrinterUserId = request.OfficePrinterUserId;
         }
 
         await _context.SaveChangesAsync();
         
+        var officeUser = settings.OfficePrinterUserId.HasValue
+            ? await _context.Users.FirstOrDefaultAsync(u => u.Id == settings.OfficePrinterUserId.Value)
+            : null;
+
+        var userName = officeUser != null 
+            ? $"{officeUser.FirstName} {officeUser.LastName}".Trim() 
+            : null;
+
         return Ok(new SystemSettingsResponse(
             settings.SubstituteDaysBefore, 
             settings.SubstituteDaysAfter,
             settings.PrintDeadlineDays,
-            settings.CurrentAcademicYear));
+            settings.CurrentAcademicYear,
+            settings.OfficePrinterUserId,
+            userName));
     }
 }
