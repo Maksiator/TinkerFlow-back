@@ -82,6 +82,7 @@ public class PrintBatchesController : ControllerBase
                 CreatedAt = DateTime.UtcNow,
                 CreatedByTrainerId = trainerId,
                 Status = PrintBatchState.Pending,
+                IsHandledByOffice = request.IsHandledByOffice,
                 PrintJobs = new List<PrintJob>()
             };
 
@@ -146,17 +147,20 @@ public class PrintBatchesController : ControllerBase
             _logger.LogInformation("Pomyślnie utworzono PrintBatch {BatchId} dla grupy {GroupId}.", batch.Id, request.GroupId);
 
             var groupName = await _context.Groups.Where(g => g.Id == request.GroupId).Select(g => g.Name).FirstOrDefaultAsync() ?? "Grupa";
+            var targetRecipient = request.IsHandledByOffice ? "Biuro (Centrala)" : "Przypisany drukarz";
             await _auditLogService.LogAsync(
                 "PrintBatches",
                 "SendToFarm",
-                $"Trener wysłał paczkę ({batch.PrintJobs.Count} projektów) dla grupy '{groupName}'",
+                $"Trener wysłał paczkę ({batch.PrintJobs.Count} projektów) dla grupy '{groupName}' [Odbiorca: {targetRecipient}]",
                 entityId: batch.Id,
                 entityName: groupName,
                 userId: trainerId,
                 ipAddress: HttpContext.GetClientIpAddress());
 
             return Ok(new { 
-                message = "Paczka wysłana pomyślnie do drukarza.", 
+                message = request.IsHandledByOffice 
+                    ? "Paczka wysłana pomyślnie do realizacji przez Biuro." 
+                    : "Paczka wysłana pomyślnie do drukarza.", 
                 batchId = batch.Id, 
                 deadline = batch.Deadline 
             });
@@ -288,8 +292,8 @@ public class PrintBatchesController : ControllerBase
         // Jeśli użytkownik nie jest administratorem, filtrujemy zlecenia
         if (user.Role == UserRole.Printer)
         {
-            // Drukarz widzi tylko paczki z grup bezpośrednio do niego przypisanych
-            query = query.Where(pb => pb.Group != null && pb.Group.AssignedPrinterId == user.Id);
+            // Drukarz widzi tylko paczki z grup bezpośrednio do niego przypisanych (z wyłączeniem paczek realizowanych przez Biuro)
+            query = query.Where(pb => !pb.IsHandledByOffice && pb.Group != null && pb.Group.AssignedPrinterId == user.Id);
         }
         else if (user.Role == UserRole.Coordinator)
         {
@@ -304,8 +308,8 @@ public class PrintBatchesController : ControllerBase
             {
                 return Forbid();
             }
-            // Trener widzi wyłącznie paczki ze swoich grup (przypisany jako drukarz lub główny trener grupy)
-            query = query.Where(pb => pb.Group != null && (pb.Group.AssignedPrinterId == user.Id || pb.Group.PrimaryTrainerId == user.Id));
+            // Trener widzi wyłącznie paczki ze swoich grup (o ile nie są realizowane przez Biuro)
+            query = query.Where(pb => !pb.IsHandledByOffice && pb.Group != null && (pb.Group.AssignedPrinterId == user.Id || pb.Group.PrimaryTrainerId == user.Id));
         }
         else if (user.Role != UserRole.Admin)
         {
@@ -356,7 +360,8 @@ public class PrintBatchesController : ControllerBase
             pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
             pb.Group?.ClassDayOfWeek,
             pb.PrinterNotes,
-            pb.Group?.TinkercadUrl
+            pb.Group?.TinkercadUrl,
+            pb.IsHandledByOffice
         )).ToList();
 
         return Ok(response);
@@ -926,7 +931,8 @@ public class PrintBatchesController : ControllerBase
             batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
             batch.Group?.ClassDayOfWeek,
             batch.PrinterNotes,
-            batch.Group?.TinkercadUrl
+            batch.Group?.TinkercadUrl,
+            batch.IsHandledByOffice
         );
 
         return Ok(response);
@@ -1061,6 +1067,78 @@ public class PrintBatchesController : ControllerBase
             return StatusCode(500, new { message = "Wystąpił błąd krytyczny podczas usuwania paczki." });
         }
     }
+
+    [HttpPatch("{batchId:guid}/takeover")]
+    [Authorize(Roles = "Admin,Coordinator")]
+    public async Task<IActionResult> TakeoverBatch(Guid batchId, [FromBody] TakeoverBatchRequest request)
+    {
+        var batch = await _context.PrintBatches
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.Branch)
+            .Include(pb => pb.Group)
+                .ThenInclude(g => g.AssignedPrinter)
+            .Include(pb => pb.PrintJobs)
+                .ThenInclude(pj => pj.Student)
+            .Include(pb => pb.PrintJobs)
+                .ThenInclude(pj => pj.StudentProject)
+                    .ThenInclude(sp => sp!.Project)
+            .FirstOrDefaultAsync(pb => pb.Id == batchId);
+
+        if (batch == null)
+            return NotFound(new { message = "Paczka wydruków nie istnieje." });
+
+        batch.IsHandledByOffice = request.IsHandledByOffice;
+        await _context.SaveChangesAsync();
+
+        var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        Guid.TryParse(userIdClaim, out var currentUserId);
+
+        var actionName = request.IsHandledByOffice ? "TakeoverBatchByOffice" : "ReleaseBatchToPrinter";
+        var groupName = batch.Group?.Name ?? "Grupa";
+        var details = request.IsHandledByOffice
+            ? $"Paczka dla grupy '{groupName}' została przejęta do realizacji przez Biuro."
+            : $"Paczka dla grupy '{groupName}' została przekazana/zwrócona do przypisanego drukarza.";
+
+        await _auditLogService.LogAsync(
+            "PrintBatches",
+            actionName,
+            details,
+            entityId: batch.Id,
+            entityName: groupName,
+            userId: currentUserId,
+            ipAddress: HttpContext.GetClientIpAddress());
+
+        var response = new PrintBatchResponse(
+            batch.Id,
+            batch.GroupId,
+            batch.Group?.Name ?? "Nieznana grupa",
+            batch.Group != null ? batch.Group.BranchId : Guid.Empty,
+            batch.Group != null && batch.Group.Branch != null ? batch.Group.Branch.Name : "Nieznany oddział",
+            batch.LessonDate,
+            batch.Deadline,
+            batch.Notes,
+            batch.Status,
+            batch.PrintJobs.Select(pj => new PrintJobResponse(
+                pj.Id,
+                pj.StudentId,
+                pj.Student != null ? $"{pj.Student.FirstName} {pj.Student.LastName}".Trim() : "Nieznany uczeń",
+                pj.StudentProjectId,
+                pj.StudentProjectId.HasValue && pj.StudentProject?.Project != null 
+                    ? pj.StudentProject.Project.Name 
+                    : (pj.CustomName ?? "Projekt własny"),
+                pj.Status
+            )).ToList(),
+            batch.CreatedAt,
+            batch.Group?.AssignedPrinterId,
+            batch.Group?.AssignedPrinter != null ? $"{batch.Group.AssignedPrinter.FirstName} {batch.Group.AssignedPrinter.LastName}".Trim() : null,
+            batch.Group?.ClassDayOfWeek,
+            batch.PrinterNotes,
+            batch.Group?.TinkercadUrl,
+            batch.IsHandledByOffice
+        );
+
+        return Ok(response);
+    }
     [HttpGet("group/{groupId:guid}/history")]
     public async Task<IActionResult> GetGroupBatchesHistory(Guid groupId)
     {
@@ -1108,7 +1186,8 @@ public class PrintBatchesController : ControllerBase
             pb.Group?.AssignedPrinter != null ? $"{pb.Group.AssignedPrinter.FirstName} {pb.Group.AssignedPrinter.LastName}".Trim() : null,
             pb.Group?.ClassDayOfWeek,
             pb.PrinterNotes,
-            pb.Group?.TinkercadUrl
+            pb.Group?.TinkercadUrl,
+            pb.IsHandledByOffice
         )).ToList();
 
         return Ok(response);

@@ -334,6 +334,9 @@ namespace TinkerFlow.Infrastructure.Migrations
                     b.Property<Guid>("GroupId")
                         .HasColumnType("uuid");
 
+                    b.Property<bool>("IsHandledByOffice")
+                        .HasColumnType("boolean");
+
                     b.Property<DateTime>("LessonDate")
                         .HasColumnType("timestamp with time zone");
 

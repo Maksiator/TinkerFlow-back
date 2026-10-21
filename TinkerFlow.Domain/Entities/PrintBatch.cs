@@ -26,5 +26,8 @@ public class PrintBatch
 
     public PrintBatchState Status { get; set; } = PrintBatchState.Pending;
 
+    // Flaga oznaczająca przejęcie lub wysłanie zlecenia do realizacji bezpośrednio przez Biuro (Admina)
+    public bool IsHandledByOffice { get; set; } = false;
+
     public ICollection<PrintJob> PrintJobs { get; set; } = new List<PrintJob>();
 }

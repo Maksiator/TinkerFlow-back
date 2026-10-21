@@ -12,7 +12,8 @@ public record CreatePrintBatchRequest(
     [Required] DateTime LessonDate,
     string? Notes,
     [Required, MinLength(1, ErrorMessage = "Paczka musi zawierać co najmniej jeden wydruk.")] 
-    List<PrintJobRequest> ProjectsToPrint
+    List<PrintJobRequest> ProjectsToPrint,
+    bool IsHandledByOffice = false
 );
 
 public record PrintJobRequest(
@@ -50,7 +51,12 @@ public record PrintBatchResponse(
     string? AssignedPrinterName = null,
     DayOfWeek? ClassDayOfWeek = null,
     string? PrinterNotes = null,
-    string? TinkercadUrl = null
+    string? TinkercadUrl = null,
+    bool IsHandledByOffice = false
+);
+
+public record TakeoverBatchRequest(
+    bool IsHandledByOffice
 );
 
 // ZAKTUALIZOWANE: Zawiera imię, nazwisko ucznia oraz czytelną nazwę modelu
