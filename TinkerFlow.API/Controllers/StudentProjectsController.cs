@@ -85,6 +85,21 @@ public class StudentProjectsController : ControllerBase
         {
             if (existingRecord != null)
             {
+                var linkedPrintJobs = await _context.PrintJobs
+                    .Include(pj => pj.StudentProject)
+                        .ThenInclude(sp => sp!.Project)
+                    .Where(pj => pj.StudentProjectId == existingRecord.Id)
+                    .ToListAsync();
+
+                foreach (var pj in linkedPrintJobs)
+                {
+                    if (string.IsNullOrWhiteSpace(pj.CustomName) && pj.StudentProject?.Project != null)
+                    {
+                        pj.CustomName = pj.StudentProject.Project.Name;
+                    }
+                    pj.StudentProjectId = null;
+                }
+
                 _context.StudentProjects.Remove(existingRecord);
                 await _context.SaveChangesAsync();
             }
@@ -138,6 +153,7 @@ public class StudentProjectsController : ControllerBase
             .Where(sp => studentIds.Contains(sp.StudentId) && projectIds.Contains(sp.ProjectId))
             .ToListAsync();
 
+        var toRemove = new List<StudentProject>();
         foreach (var req in requests)
         {
             var existing = existingRecords.FirstOrDefault(sp => sp.StudentId == req.StudentId && sp.ProjectId == req.ProjectId);
@@ -146,7 +162,7 @@ public class StudentProjectsController : ControllerBase
             {
                 if (existing != null)
                 {
-                    _context.StudentProjects.Remove(existing);
+                    toRemove.Add(existing);
                     existingRecords.Remove(existing);
                 }
             }
@@ -170,6 +186,27 @@ public class StudentProjectsController : ControllerBase
                     existingRecords.Add(newRecord);
                 }
             }
+        }
+
+        if (toRemove.Any())
+        {
+            var toRemoveIds = toRemove.Select(sp => sp.Id).ToList();
+            var linkedPrintJobs = await _context.PrintJobs
+                .Include(pj => pj.StudentProject)
+                    .ThenInclude(sp => sp!.Project)
+                .Where(pj => pj.StudentProjectId.HasValue && toRemoveIds.Contains(pj.StudentProjectId.Value))
+                .ToListAsync();
+
+            foreach (var pj in linkedPrintJobs)
+            {
+                if (string.IsNullOrWhiteSpace(pj.CustomName) && pj.StudentProject?.Project != null)
+                {
+                    pj.CustomName = pj.StudentProject.Project.Name;
+                }
+                pj.StudentProjectId = null;
+            }
+
+            _context.StudentProjects.RemoveRange(toRemove);
         }
 
         await _context.SaveChangesAsync();

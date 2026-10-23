@@ -126,5 +126,12 @@ public class TinkerFlowDbContext : IdentityDbContext<User, IdentityRole<Guid>, G
             .WithMany()
             .HasForeignKey(s => s.OfficePrinterUserId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // 9. Relacja PrintJob -> StudentProject (SetNull przy usunięciu przypisania projektu)
+        builder.Entity<PrintJob>()
+            .HasOne(pj => pj.StudentProject)
+            .WithMany()
+            .HasForeignKey(pj => pj.StudentProjectId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

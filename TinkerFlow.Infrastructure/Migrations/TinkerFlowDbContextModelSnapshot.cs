@@ -835,7 +835,8 @@ namespace TinkerFlow.Infrastructure.Migrations
 
                     b.HasOne("TinkerFlow.Domain.Entities.StudentProject", "StudentProject")
                         .WithMany()
-                        .HasForeignKey("StudentProjectId");
+                        .HasForeignKey("StudentProjectId")
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.Navigation("PrintBatch");
 
