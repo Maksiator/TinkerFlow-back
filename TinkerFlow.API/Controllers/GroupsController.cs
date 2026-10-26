@@ -61,6 +61,16 @@ public class GroupsController : ControllerBase
         var branchExists = await _context.Branches.AnyAsync(b => b.Id == request.BranchId);
         if (!branchExists) return BadRequest(new { message = "Podany oddział nie istnieje." });
 
+        // Tylko Administrator może przypisać konto Administratora jako drukarza
+        if (userRoleStr == "Coordinator" && request.AssignedPrinterId.HasValue)
+        {
+            var printerUser = await _context.Users.FindAsync(request.AssignedPrinterId.Value);
+            if (printerUser != null && printerUser.Role == UserRole.Admin)
+            {
+                return BadRequest(new { message = "Tylko Administrator może przypisać konto administratora jako drukarza grupy." });
+            }
+        }
+
         var newGroup = new Group
         {
             Id = Guid.NewGuid(),
@@ -113,6 +123,16 @@ public class GroupsController : ControllerBase
             var hasAccessToNewBranch = await _context.UserBranches
                 .AnyAsync(ub => ub.UserId == currentUserId && ub.BranchId == request.BranchId);
             if (!hasAccessToNewBranch) return Forbid();
+
+            // 3. Koordynator nie może przypisać Administratora jako drukarza
+            if (request.AssignedPrinterId.HasValue && request.AssignedPrinterId != group.AssignedPrinterId)
+            {
+                var targetPrinter = await _context.Users.FindAsync(request.AssignedPrinterId.Value);
+                if (targetPrinter != null && targetPrinter.Role == UserRole.Admin)
+                {
+                    return BadRequest(new { message = "Tylko Administrator może przypisać konto administratora jako drukarza grupy." });
+                }
+            }
         }
         
         group.Name = request.Name;
@@ -519,15 +539,21 @@ public class GroupsController : ControllerBase
         }
 
         string? printerName = null;
-        // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer lub jest trenerem z uprawnieniem drukarza
+        // Jeśli wybrano drukarza, upewnijmy się, że istnieje i ma rolę Printer, jest trenerem z uprawnieniem drukarza, lub jest Adminem (wyłącznie gdy przypisuje Admin)
         if (request.PrinterId.HasValue)
         {
             var printerUser = await _context.Users.FindAsync(request.PrinterId.Value);
-            if (printerUser == null || (printerUser.Role != UserRole.Printer && !(printerUser.Role == UserRole.Trainer && printerUser.CanActAsPrinter)))
+            var isAllowedPrinter = printerUser != null && (
+                printerUser.Role == UserRole.Printer ||
+                (printerUser.Role == UserRole.Trainer && printerUser.CanActAsPrinter) ||
+                (printerUser.Role == UserRole.Admin && userRoleStr == "Admin")
+            );
+
+            if (!isAllowedPrinter)
             {
-                return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada uprawnień Drukarza." });
+                return BadRequest(new { message = "Wybrany użytkownik nie istnieje lub nie posiada uprawnień Drukarza (przypisanie administratora jako drukarza jest dozwolone wyłącznie dla konta Administratora)." });
             }
-            printerName = $"{printerUser.FirstName} {printerUser.LastName}";
+            printerName = $"{printerUser!.FirstName} {printerUser.LastName}";
         }
 
         var groups = await _context.Groups
